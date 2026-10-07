@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+vendor/
+.pnp
+.pnp.js
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Build outputs & caches
+dist/
+build/
+.output/
+.cache/
+*.log
+
+# Operating System & IDE
+.DS_Store
+Thumbs.db

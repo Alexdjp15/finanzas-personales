@@ -1,0 +1,49 @@
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--no-usage-statistics"
+      ]
+    },
+    "context7": {
+      "serverUrl": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "<TU_API_KEY_DE_CONTEXT7>"
+      }
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "<TU_TOKEN_DE_GITHUB>"
+      }
+    },
+    "figma": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@ferrucc-io/figma-mcp-server"
+      ],
+      "env": {
+        "FIGMA_ACCESS_TOKEN": "<TU_TOKEN_DE_FIGMA>"
+      }
+    },
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-supabase"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "<TU_SUPABASE_ACCESS_TOKEN>",
+        "SUPABASE_PROJECT_ID": "<TU_SUPABASE_PROJECT_ID>"
+      }
+    }
+  }
+}
