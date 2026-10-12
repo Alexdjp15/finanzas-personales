@@ -10,13 +10,32 @@ vendor/
 .env.*.local
 *.pem
 
-# Build outputs & caches
-dist/
+# Flutter & Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
 build/
+dist/
 .output/
 .cache/
 *.log
 
-# Operating System & IDE
+# IDE & OS
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
 .DS_Store
 Thumbs.db
+.metadata
+
+# Scratch files & local profiles
+scratch/
+supabase/.temp/
+
+# MCP config holds access tokens
+mcp_config.json
