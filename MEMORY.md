@@ -864,6 +864,20 @@ Este archivo conserva el contexto histórico, el estado técnico, las decisiones
   - `SUPABASE_URL`: URL del proyecto Supabase (`https://ciesbycnqesrubtcrjbm.supabase.co`).
   - `SUPABASE_ANON_KEY`: Clave pública anon de Supabase.
 
+### 25.5. Resolución de Errores de CI/CD y Verificación en Vivo de GitHub Pages — 2026-10-12
+- **Causas del Fallo Inicial (#1):**
+  - Advertencia de análisis estático en `test/domain/bank_catalog_and_intent_test.dart:111:31` (`invalid_null_aware_operator` sobre `intent.sourceName?.toLowerCase()` siendo `sourceName` no nulo). En el runner de Linux, `flutter analyze` detuvo el pipeline con código de salida 1.
+  - Al detenerse el pipeline, no se generaron artefactos y la URL pública arrojó error 404.
+  - Adicionalmente, GitHub Pages en el repositorio nuevo estaba configurado con `build_type: "workflow"`, lo que requería la acción oficial `actions/deploy-pages@v4` y `actions/upload-pages-artifact@v3` para activar la publicación.
+- **Correcciones Implementadas:**
+  1. Se eliminó el operador innecesario `?.` en `bank_catalog_and_intent_test.dart`.
+  2. Se configuró despliegue nativo en `.github/workflows/deploy.yml` mediante `actions/upload-pages-artifact@v3` y `actions/deploy-pages@v4`, conservando además la sincronización de respaldo a la rama `gh-pages` con `peaceiris/actions-gh-pages@v3`.
+  3. Se retiró el paso de Java innecesario para compilar Flutter Web, acelerando el flujo a ~2 minutos.
+- **Verificación en Vivo (100% Éxito):**
+  - Workflow #3 (`38212889574`) completado exitosamente con check verde en todas las fases (`build-and-deploy` en 2m3s y `deploy-to-pages` en 8s).
+  - Petición HTTP a `https://alexdjp15.github.io/finanzas-personales/` respondió con `HTTP/1.1 200 OK` y `<title>Finanzas Personales - APF</title>`.
+
+
 
 
 
