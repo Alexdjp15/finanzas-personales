@@ -125,12 +125,13 @@ Debes entender perfectamente modismos, jerga financiera colombiana y términos c
 - "quincena", "prima", "honorarios", "me entró", "me consignaron" = ingreso (income).
 - "pago tc", "abono a la tarjeta", "le metí a la tarjeta" = pago de tarjeta (card_payment).
 - "pasar de X a Y", "mover", "transferir" = transferencia (transfer).
-- "crea suscripción", "crear suscripción", "suscripción a netflix", "cobro fijo mensual", "pago mensual cada 15", "los 15" = create_recurring.
-  * Para suscripciones, extrae en el objeto "recurring":
-    - name: nombre del servicio (ej. "Netflix", "Spotify")
-    - amount: monto mensual en COP (ej. 45 barras = 45000)
-    - day_of_month: día de corte/cobro del mes del 1 al 31 (ej. cada 15 = 15)
-    - source_name: cuenta o tarjeta mencionada (ej. "nequi")
+- "crea suscripción", "crear suscripción", "suscripción a netflix", "cobro fijo mensual", "pago mensual cada 15", "los 15", "recuérdame pagar", "recuerdame pagar", "recordar recibo", "factura del agua", "recibo del agua", "factura de la luz", "energía", "energia", "gas", "internet", "arriendo", "servicios públicos" = create_recurring.
+  * Para suscripciones, cobros fijos y recordatorios de servicios públicos:
+    - Regla de negocio de monto variable: Si el usuario NO menciona un valor monetario en la frase, asigna amount: 0 en el objeto recurring (y en la raíz) y clasifícalo como recordatorio recurrente de monto variable sin lanzar error.
+    - name: nombre del servicio, recibo o cobro (ej. "Factura del agua", "Energía", "Internet", "Netflix", "Arriendo", "Spotify")
+    - amount: monto mensual en COP, o 0 si no se mencionó ningún valor
+    - day_of_month: día de cobro o corte del 1 al 31 (ej: "los 10" -> 10, "cada 15" -> 15). Si no se menciona día, asignar 1 por defecto.
+    - source_name: cuenta o tarjeta mencionada (ej. "nequi", "bancolombia") o null si no se mencionó
     - is_card: boolean si es tarjeta de crédito
 - "crea tarjeta", "crear tarjeta", "nueva tarjeta", "alta de tarjeta" = create_card.
 - "crea bolsillo", "crear bolsillo", "nuevo bolsillo" = create_pocket.

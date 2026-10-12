@@ -48,10 +48,11 @@ class _RecurringPaymentDialogState extends ConsumerState<RecurringPaymentDialog>
 
   Future<void> _createPayment() async {
     final name = _nameController.text.trim();
-    final amount = int.tryParse(_amountController.text.trim());
+    final parsedAmount = int.tryParse(_amountController.text.trim());
+    final amount = parsedAmount ?? 0;
     final day = int.tryParse(_dayController.text.trim());
 
-    if (name.isEmpty || amount == null || amount <= 0 || day == null || day < 1 || day > 31) {
+    if (name.isEmpty || amount < 0 || day == null || day < 1 || day > 31) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor llena los campos con valores válidos (Día 1-31)')),
       );
@@ -235,7 +236,11 @@ class _RecurringPaymentDialogState extends ConsumerState<RecurringPaymentDialog>
                             child: TextField(
                               controller: _amountController,
                               keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(labelText: 'Monto mensual COP', prefixText: '\$ '),
+                              decoration: const InputDecoration(
+                                labelText: 'Monto mensual COP',
+                                hintText: '0 para monto variable / por definir',
+                                prefixText: '\$ ',
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -404,7 +409,7 @@ class _RecurringPaymentDialogState extends ConsumerState<RecurringPaymentDialog>
                           style: TextStyle(fontWeight: FontWeight.bold, color: palette.textPrimary),
                         ),
                         subtitle: Text(
-                          'Día ${r.dayOfMonth} de cada mes • \$${r.amount} • Auto: ${r.autoDeduct ? "Sí" : "No"}',
+                          'Día ${r.dayOfMonth} de cada mes • ${r.amount == 0 ? "Monto Variable / Por Definir (\$0 COP)" : "\$${r.amount}"} • Auto: ${r.autoDeduct ? "Sí" : "No"}',
                           style: TextStyle(color: palette.textSecondary),
                         ),
                         trailing: Row(

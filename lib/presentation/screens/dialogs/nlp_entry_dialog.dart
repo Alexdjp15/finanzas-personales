@@ -118,6 +118,8 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
       _isAiAnalyzed = parsed.isAiAnalyzed;
       if (parsed.amount != null) {
         _amountController.text = parsed.amount.toString();
+      } else if (parsed.intent is CreateRecurringIntent) {
+        _amountController.text = '0';
       }
       if (parsed.intent is CreateRecurringIntent) {
         _recurringDayController.text =
@@ -159,6 +161,8 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
               _isAiAnalyzed = true;
               if (aiResult.amount != null) {
                 _amountController.text = aiResult.amount.toString();
+              } else if (aiResult.intent is CreateRecurringIntent) {
+                _amountController.text = '0';
               }
               if (aiResult.intent is CreateRecurringIntent) {
                 _recurringDayController.text =
@@ -184,7 +188,11 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
     if (_intent is CreatePocketIntent) return 'Crear Bolsillo';
     if (_intent is CreateAccountIntent) return 'Crear Cuenta';
     if (_intent is CreateCardIntent) return 'Crear Tarjeta';
-    if (_intent is CreateRecurringIntent) return 'Crear Suscripción';
+    if (_intent is CreateRecurringIntent) {
+      final r = _intent as CreateRecurringIntent;
+      final enteredAmount = int.tryParse(_amountController.text.trim()) ?? (r.amount ?? 0);
+      return enteredAmount == 0 ? 'Guardar Recordatorio' : 'Crear Suscripción';
+    }
     if (_intent is TransferIntent) return 'Confirmar Transferencia';
     if (_isCardPayment || _intent is CardPaymentIntent) return 'Confirmar Abono a Tarjeta';
     if (_kind == TransactionKind.income || _intent is IncomeIntent) return 'Confirmar Ingreso';
@@ -276,22 +284,27 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
 
         final enteredDay = int.tryParse(_recurringDayController.text.trim()) ?? (rIntent.dayOfMonth ?? 1);
         final dayOfMonth = enteredDay.clamp(1, 31);
+        final recurringAmount = amount >= 0 ? amount : (rIntent.amount ?? 0);
 
         await repo.createRecurringPayment(
           name: rIntent.name,
-          amount: amount > 0 ? amount : (rIntent.amount ?? 50000),
+          amount: recurringAmount,
           dayOfMonth: dayOfMonth,
           startDate: DateTime.now(),
           methodType: isCard ? PaymentMethodType.creditCard : PaymentMethodType.accountPocket,
           methodId: methodId,
           pocketId: pocketId,
-          autoDeduct: true,
+          autoDeduct: recurringAmount > 0,
         );
         invalidateFinanceProviders(ref);
         if (mounted) {
           Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Suscripción "${rIntent.name}" creada exitosamente')),
+            SnackBar(
+              content: Text(recurringAmount == 0
+                  ? 'Recordatorio "${rIntent.name}" guardado exitosamente'
+                  : 'Suscripción "${rIntent.name}" creada exitosamente'),
+            ),
           );
         }
         return;
@@ -511,16 +524,40 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _phraseController,
+                      minLines: 2,
+                      maxLines: 8,
+                      keyboardType: TextInputType.multiline,
                       decoration: InputDecoration(
-                        hintText: 'Ej: 50000 compra tc bancolombia | pago tc 100000',
+                        hintText: 'Ej: 50000 compra tc bancolombia | recuérdame pagar la energía los 10',
                         labelText: 'Escribe o dicta tu transacción en lenguaje natural',
-                        prefixIcon: const Icon(Icons.chat_bubble_outline),
+                        alignLabelWithHint: true,
+                        prefixIcon: const Padding(
+                          padding: EdgeInsets.only(top: 12.0),
+                          child: Icon(Icons.chat_bubble_outline),
+                        ),
                         suffixIcon: Padding(
-                          padding: const EdgeInsets.only(right: 4.0),
-                          child: VoiceDictationButton(
-                            key: const Key('voice_dictation_button'),
-                            isListening: dictationState.isListening,
-                            onPressed: () => _toggleVoiceDictation(catalog),
+                          padding: const EdgeInsets.only(right: 6.0, top: 4.0),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              if (_phraseController.text.isNotEmpty)
+                                IconButton(
+                                  key: const Key('nlp_clear_text_button'),
+                                  icon: const Icon(Icons.clear, size: 20),
+                                  tooltip: 'Limpiar texto',
+                                  splashRadius: 20,
+                                  onPressed: () {
+                                    _phraseController.clear();
+                                    _onPhraseChanged('', catalog);
+                                  },
+                                ),
+                              VoiceDictationButton(
+                                key: const Key('voice_dictation_button'),
+                                isListening: dictationState.isListening,
+                                onPressed: () => _toggleVoiceDictation(catalog),
+                              ),
+                            ],
                           ),
                         ),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -689,7 +726,9 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'Suscripción Detectada: "${(_intent as CreateRecurringIntent).name}"',
+                                    ((_intent as CreateRecurringIntent).amount == null || (_intent as CreateRecurringIntent).amount == 0)
+                                        ? 'Recordatorio / Recibo: "${(_intent as CreateRecurringIntent).name}"'
+                                        : 'Suscripción Detectada: "${(_intent as CreateRecurringIntent).name}"',
                                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: colors.textPrimary),
                                   ),
                                 ),
@@ -700,6 +739,34 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
                               spacing: 8,
                               runSpacing: 4,
                               children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: ((_intent as CreateRecurringIntent).amount == null || (_intent as CreateRecurringIntent).amount == 0)
+                                        ? colors.brandAccentBg
+                                        : colors.surfaceCard,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: ((_intent as CreateRecurringIntent).amount == null || (_intent as CreateRecurringIntent).amount == 0)
+                                          ? colors.brandAccent.withValues(alpha: 0.4)
+                                          : colors.borderSubtle,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    ((_intent as CreateRecurringIntent).amount == null || (_intent as CreateRecurringIntent).amount == 0)
+                                        ? 'Monto Variable / Por Definir (\$0 COP)'
+                                        : 'Monto: ${Formatters.cop((_intent as CreateRecurringIntent).amount!)}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: ((_intent as CreateRecurringIntent).amount == null || (_intent as CreateRecurringIntent).amount == 0)
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                      color: ((_intent as CreateRecurringIntent).amount == null || (_intent as CreateRecurringIntent).amount == 0)
+                                          ? colors.brandAccent
+                                          : colors.textSecondary,
+                                    ),
+                                  ),
+                                ),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(

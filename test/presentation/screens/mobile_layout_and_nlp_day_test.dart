@@ -174,5 +174,200 @@ void main() {
       expect(find.text('Bolsillo'), findsWidgets);
       expect(tester.takeException(), isNull);
     });
+
+    test('NlpParser recognizes reminders without amount (variable amount)', () {
+      const catalog = NlpCatalog.empty;
+
+      final res1 = NlpParser.parse('recuérdame pagar la energía los 10', catalog);
+      expect(res1.intent, isA<CreateRecurringIntent>());
+      final intent1 = res1.intent as CreateRecurringIntent;
+      expect(intent1.name.toLowerCase(), contains('energia'));
+      expect(intent1.amount, equals(0));
+      expect(intent1.dayOfMonth, equals(10));
+      expect(res1.issues, isEmpty);
+
+      final res2 = NlpParser.parse('recordar recibo del agua cada 15', catalog);
+      expect(res2.intent, isA<CreateRecurringIntent>());
+      final intent2 = res2.intent as CreateRecurringIntent;
+      expect(intent2.name.toLowerCase(), contains('agua'));
+      expect(intent2.amount, equals(0));
+      expect(intent2.dayOfMonth, equals(15));
+      expect(res2.issues, isEmpty);
+    });
+
+    testWidgets('NlpEntryDialog displays multiline field, clear button and variable amount badge (\$0 COP)', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final mockAiService = AiAssistantService(
+        functionInvoker: (action, payload) async {
+          return {
+            'success': true,
+            'intent': {
+              'intent_type': 'create_recurring',
+              'amount': 0,
+              'recurring': {
+                'name': 'energía',
+                'amount': 0,
+                'day_of_month': 10,
+                'is_card': false,
+              },
+            },
+          };
+        },
+      );
+
+      const catalog = NlpCatalog.empty;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            aiAssistantServiceProvider.overrideWithValue(mockAiService),
+            nlpCatalogProvider.overrideWith((ref) => Future.value(catalog)),
+            accountsProvider.overrideWith((ref) => Future.value([])),
+            pocketsProvider.overrideWith((ref) => Future.value([])),
+            creditCardsProvider.overrideWith((ref) => Future.value([])),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: NlpEntryDialog(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final phraseField = find.byType(TextField).first;
+      final textFieldWidget = tester.widget<TextField>(phraseField);
+      expect(textFieldWidget.minLines, equals(2));
+      expect(textFieldWidget.maxLines, equals(8));
+      expect(textFieldWidget.keyboardType, equals(TextInputType.multiline));
+
+      // Enter reminder phrase without amount
+      await tester.enterText(phraseField, 'recuérdame pagar la energía los 10');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      // Clear button is visible
+      final clearBtn = find.byKey(const Key('nlp_clear_text_button'));
+      expect(clearBtn, findsOneWidget);
+
+      // Variable amount badge is displayed
+      expect(find.text('Monto Variable / Por Definir (\$0 COP)'), findsOneWidget);
+      expect(find.text('Guardar Recordatorio'), findsOneWidget);
+
+      // Tapping clear button clears text
+      await tester.tap(clearBtn);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('nlp_clear_text_button')), findsNothing);
+    });
+
+    testWidgets('DashboardScreen renders "⚡ Acciones Rápidas" on mobile and opens bottom sheet with 6 actions', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(360, 720);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            accountsProvider.overrideWith((ref) => Future.value([])),
+            pocketsProvider.overrideWith((ref) => Future.value([])),
+            creditCardsProvider.overrideWith((ref) => Future.value([])),
+            activeAlertsProvider.overrideWith((ref) => Future.value([])),
+          ],
+          child: const MaterialApp(
+            home: DashboardScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Quick actions prominent button is visible
+      final quickActionsBtn = find.byKey(const Key('dashboard_quick_actions_button'));
+      expect(quickActionsBtn, findsOneWidget);
+      expect(find.text('⚡ Acciones Rápidas'), findsOneWidget);
+
+      // Ensure visible and tap to open bottom sheet
+      await tester.ensureVisible(quickActionsBtn);
+      await tester.tap(quickActionsBtn);
+      await tester.pumpAndSettle();
+
+      // Verify all 6 options in bottom sheet
+      expect(find.text('Transferir entre Bolsillos'), findsOneWidget);
+      expect(find.text('Abonar a Tarjeta (Pagar TC)'), findsOneWidget);
+      expect(find.text('Gestionar Cuentas Banco y Bolsillos'), findsOneWidget);
+      expect(find.text('Gestionar Tarjetas de Crédito'), findsOneWidget);
+      expect(find.text('Suscripciones y Recurrentes'), findsOneWidget);
+      expect(find.text('Auditar Gastos Hormiga (IA)'), findsOneWidget);
+    });
+
+    testWidgets('DashboardScreen toggles accounts and cards collapsible panels showing compact summaries', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(360, 720);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      const mockAccounts = [Account(id: 'a1', name: 'Bancolombia')];
+      const mockPockets = [Pocket(id: 'p1', accountId: 'a1', name: 'Personal', balance: 500000)];
+      const mockCards = [
+        CreditCard(
+          id: 'c1',
+          entity: 'Nu',
+          name: 'Moradita',
+          franchise: 'Mastercard',
+          lastFourDigits: '1234',
+          creditLimit: 2000000,
+          availableCredit: 1950000,
+          cutOffDay: 15,
+          paymentDueDay: 30,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            accountsProvider.overrideWith((ref) => Future.value(mockAccounts)),
+            pocketsProvider.overrideWith((ref) => Future.value(mockPockets)),
+            creditCardsProvider.overrideWith((ref) => Future.value(mockCards)),
+            activeAlertsProvider.overrideWith((ref) => Future.value([])),
+          ],
+          child: const MaterialApp(
+            home: DashboardScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Accounts is expanded by default, showing accounts title and pocket
+      expect(find.text('Cuentas Banco y Bolsillos'), findsOneWidget);
+      expect(find.text('  • Personal'), findsOneWidget);
+
+      // Cards is collapsed by default, showing compact summary with debt (50,000 COP)
+      expect(find.textContaining('Tarjetas (1) · Deuda'), findsOneWidget);
+      expect(find.text('Utilización: 3%'), findsNothing); // Inner details hidden
+
+      // Ensure visible and tap accounts toggle to collapse
+      final accountsToggle = find.byKey(const Key('dashboard_accounts_toggle_header'));
+      await tester.ensureVisible(accountsToggle);
+      await tester.tap(accountsToggle);
+      await tester.pumpAndSettle();
+
+      // Now accounts shows compact summary
+      expect(find.textContaining('Cuentas Banco (1) · 500.000'), findsOneWidget);
+      expect(find.text('  • Personal'), findsNothing);
+
+      // Ensure visible and tap cards toggle to expand
+      final cardsToggle = find.byKey(const Key('dashboard_cards_toggle_header'));
+      await tester.ensureVisible(cardsToggle);
+      await tester.tap(cardsToggle);
+      await tester.pumpAndSettle();
+
+      // Now cards is expanded and shows "Tarjetas de Crédito" and utilization
+      expect(find.text('Tarjetas de Crédito'), findsOneWidget);
+      expect(find.text('Utilización: 3%'), findsOneWidget);
+    });
   });
 }

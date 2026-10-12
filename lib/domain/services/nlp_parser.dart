@@ -233,7 +233,7 @@ class NlpParser {
   static final _createAccountPattern = RegExp(r'\b(?:crear|crea|nueva|nuevo)\s+cuenta\b', caseSensitive: false);
   static final _createCardPattern = RegExp(r'\b(?:crear|crea|nueva|nuevo)\s+(?:tarjeta(?:\s+de\s+credito)?|tc)\b', caseSensitive: false);
   static final _createRecurringPattern = RegExp(
-    r'\b(?:crear|crea|nueva|nuevo|agrega|agregar|anade|añadir)?\s*(?:suscripcion|suscripción|recurrente|pago\s+recurrente)\b',
+    r'\b(?:crear|crea|nueva|nuevo|agrega|agregar|anade|añadir)?\s*(?:suscripcion|suscripción|recurrente|pago\s+recurrente)\b|\b(?:recuerdame|recuérdame|recordar)\s+(?:a\s+)?(?:pagar\s+)?(?:el\s+|la\s+|los\s+|mi\s+)?(?:recibo|factura|servicio|pago|arriendo|energia|energía|agua|luz|gas|internet)\b|\b(?:recuerdame|recuérdame|recordar)\s+pagar\b|\b(?:factura|recibo)\s+(?:de|del)\b',
     caseSensitive: false,
   );
   static final _transferPattern = RegExp(r'\b(?:transferi|transferir|pase|pasar|movi|mover|traslade|trasladar)\b', caseSensitive: false);
@@ -567,14 +567,24 @@ class NlpParser {
   }
 
   static CreateRecurringIntent _parseCreateRecurring(String text, NlpCatalog catalog, int? amount) {
-    final rawMatch = RegExp(
+    String body = text;
+    final reminderMatch = RegExp(
+      r'(?:recuerdame|recuérdame|recordar)\s+(?:a\s+)?(?:pagar\s+)?(?:el\s+|la\s+|los\s+|mi\s+)?(.+)',
+      caseSensitive: false,
+    ).firstMatch(text);
+    final subscriptionMatch = RegExp(
       r'(?:crear|crea|nueva|nuevo|agrega|agregar|anade|añadir)?\s*(?:suscripcion|suscripción|recurrente|pago\s+recurrente)\s*(.+)',
       caseSensitive: false,
     ).firstMatch(text);
-    String body = rawMatch?.group(1) ?? 'Suscripcion';
+
+    if (reminderMatch != null) {
+      body = reminderMatch.group(1) ?? 'Recordatorio';
+    } else if (subscriptionMatch != null) {
+      body = subscriptionMatch.group(1) ?? 'Suscripcion';
+    }
 
     int? dayOfMonth;
-    final dayMatch = RegExp(r'(?:dia|cada)\s+(\d{1,2})', caseSensitive: false).firstMatch(text);
+    final dayMatch = RegExp(r'(?:dia|cada|los|el)\s+(\d{1,2})', caseSensitive: false).firstMatch(text);
     if (dayMatch != null) dayOfMonth = int.tryParse(dayMatch.group(1)!);
 
     String? sourceId;
@@ -596,17 +606,18 @@ class NlpParser {
     }
 
     String name = body
-        .split(RegExp(r'\b(?:mensual|cada\s+mes|cada|dia|desde|de|\$|\d+)\b', caseSensitive: false))[0]
-        .replaceAll(RegExp(r'\b(mensual|cada\s+mes|cada|\$|\d+|barras?|lucas?|palos?|cop)\b', caseSensitive: false), '')
+        .split(RegExp(r'\b(?:mensual|cada\s+mes|cada|dia|los\s+\d{1,2}|el\s+\d{1,2}|desde|\$|\d+)\b', caseSensitive: false))[0]
+        .replaceAll(RegExp(r'\b(mensual|cada\s+mes|cada|dia|\$|\d+|barras?|lucas?|palos?|cop)\b', caseSensitive: false), '')
         .trim();
+    name = name.replaceFirst(RegExp(r'^(?:el|la|los|las|mi|mis)\s+', caseSensitive: false), '').trim();
     if (sourceName.isNotEmpty) {
       name = name.replaceAll(RegExp('\\b${RegExp.escape(sourceName)}\\b', caseSensitive: false), '').trim();
     }
-    if (name.isEmpty) name = 'Suscripción';
+    if (name.isEmpty) name = 'Recordatorio';
 
     return CreateRecurringIntent(
       name: _capitalize(name),
-      amount: amount,
+      amount: amount ?? 0,
       dayOfMonth: dayOfMonth ?? 1,
       sourceName: sourceName,
       sourceId: sourceId,
@@ -746,15 +757,9 @@ class NlpParser {
       if (val != null) return (val * 1000).round();
     }
 
-    // 4. Standard numerical amounts (skipping recurring billing days like "cada 15" or "dia 15")
-    final textWithoutDays = lower.replaceAll(RegExp(r'\b(?:cada|dia)\s+\d{1,2}\b'), ' ');
+    // 4. Standard numerical amounts (skipping recurring billing days like "cada 15", "dia 15", "los 10", "el 5")
+    final textWithoutDays = lower.replaceAll(RegExp(r'\b(?:cada|dia|los|el)\s+\d{1,2}\b'), ' ');
     for (final match in _amountPattern.allMatches(textWithoutDays)) {
-      final digits = match.group(1)!.replaceAll(RegExp(r'[.,]'), '');
-      final value = int.tryParse(digits);
-      if (value != null && value > 0) return value;
-    }
-
-    for (final match in _amountPattern.allMatches(lower)) {
       final digits = match.group(1)!.replaceAll(RegExp(r'[.,]'), '');
       final value = int.tryParse(digits);
       if (value != null && value > 0) return value;

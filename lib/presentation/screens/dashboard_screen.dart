@@ -22,11 +22,214 @@ import 'dialogs/recurring_payment_dialog.dart';
 import 'dialogs/reminder_settings_dialog.dart';
 import 'dialogs/transfer_dialog.dart';
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  bool _accountsExpanded = true;
+  bool _cardsExpanded = false;
+
+  void _showQuickActionsBottomSheet(BuildContext context) {
+    final colors = AppColors.of(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: colors.borderSubtle,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: colors.brandAccentBg,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.bolt_rounded, color: colors.brandAccent, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '⚡ Acciones Rápidas',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              'Operaciones financieras y gestión en 1 toque',
+                              style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Divider(color: colors.borderSubtle, height: 1),
+                  const SizedBox(height: 12),
+                  _buildQuickActionTile(
+                    colors: colors,
+                    icon: Icons.swap_horiz_rounded,
+                    title: 'Transferir entre Bolsillos',
+                    subtitle: 'Mueve fondos entre cuentas y bolsillos',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      showDialog(context: context, builder: (_) => const TransferDialog());
+                    },
+                  ),
+                  _buildQuickActionTile(
+                    colors: colors,
+                    icon: Icons.payment_rounded,
+                    title: 'Abonar a Tarjeta (Pagar TC)',
+                    subtitle: 'Registra un pago para restaurar tu cupo',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      showDialog(context: context, builder: (_) => const CardPaymentDialog());
+                    },
+                  ),
+                  _buildQuickActionTile(
+                    colors: colors,
+                    icon: Icons.folder_open_rounded,
+                    title: 'Gestionar Cuentas Banco y Bolsillos',
+                    subtitle: 'Crea, edita o elimina entidades bancarias',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      showDialog(context: context, builder: (_) => const PocketCrudDialog());
+                    },
+                  ),
+                  _buildQuickActionTile(
+                    colors: colors,
+                    icon: Icons.credit_card_rounded,
+                    title: 'Gestionar Tarjetas de Crédito',
+                    subtitle: 'Configura cupos, franquicias y fechas',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      showDialog(context: context, builder: (_) => const CreditCardCrudDialog());
+                    },
+                  ),
+                  _buildQuickActionTile(
+                    colors: colors,
+                    icon: Icons.autorenew_rounded,
+                    title: 'Suscripciones y Recurrentes',
+                    subtitle: 'Monitorea cobros fijos y servicios',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      showDialog(context: context, builder: (_) => const RecurringPaymentDialog());
+                    },
+                  ),
+                  _buildQuickActionTile(
+                    key: const Key('dashboard_audit_expenses_button'),
+                    colors: colors,
+                    icon: Icons.troubleshoot_rounded,
+                    title: 'Auditar Gastos Hormiga (IA)',
+                    subtitle: 'Analiza fugas de liquidez y consumos',
+                    iconColor: colors.brandAccent,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      showDialog(context: context, builder: (_) => const ExpenseAuditDialog());
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildQuickActionTile({
+    Key? key,
+    required AppPalette colors,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    Color? iconColor,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: colors.surfaceBase,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          key: key,
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: (iconColor ?? colors.brandAccent).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: iconColor ?? colors.brandAccent, size: 20),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: colors.textMuted, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final totalsAsync = ref.watch(dashboardTotalsProvider);
     final accountsAsync = ref.watch(accountsProvider);
     final pocketsAsync = ref.watch(pocketsProvider);
@@ -516,61 +719,30 @@ class DashboardScreen extends ConsumerWidget {
                   const SizedBox(height: 24),
 
                   // --- Action Shortcuts ---
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () => showDialog(context: context, builder: (_) => const TransferDialog()),
-                        icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-                        label: const Text('Transferir entre Bolsillos'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => showDialog(context: context, builder: (_) => const CardPaymentDialog()),
-                        icon: const Icon(Icons.payment_rounded, size: 18),
-                        label: const Text('Abonar a Tarjeta (Pagar TC)'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => showDialog(context: context, builder: (_) => const PocketCrudDialog()),
-                        icon: const Icon(Icons.folder_open_rounded, size: 18),
-                        label: const Text('Gestionar Cuentas Banco y Bolsillos'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => showDialog(context: context, builder: (_) => const CreditCardCrudDialog()),
-                        icon: const Icon(Icons.credit_card_rounded, size: 18),
-                        label: const Text('Gestionar Tarjetas de Crédito'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => showDialog(context: context, builder: (_) => const RecurringPaymentDialog()),
-                        icon: const Icon(Icons.autorenew_rounded, size: 18),
-                        label: const Text('Suscripciones y Recurrentes'),
-                      ),
-                      OutlinedButton.icon(
-                        key: const Key('dashboard_audit_expenses_button'),
-                        onPressed: () => showDialog(context: context, builder: (_) => const ExpenseAuditDialog()),
-                        icon: const Icon(Icons.troubleshoot_rounded, size: 18),
-                        label: const Text('Auditar Gastos Hormiga (IA)'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
-
-                  // --- Split View: Cuentas Banco & Bolsillos | Tarjetas de Crédito ---
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isWide = constraints.maxWidth >= 850;
-
-                      final accountsSection = Container(
-                        decoration: AppDecorations.card(
-                          backgroundColor: colors.surfaceCard,
-                          borderColor: colors.borderSubtle,
-                          borderRadius: 16,
-                        ),
-                        padding: const EdgeInsets.all(22.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                  if (isMobile)
+                    SizedBox(
+                      width: double.infinity,
+                      child: Material(
+                        color: colors.surfaceCard,
+                        borderRadius: BorderRadius.circular(14),
+                        child: InkWell(
+                          key: const Key('dashboard_quick_actions_button'),
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => _showQuickActionsBottomSheet(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: colors.brandAccent.withValues(alpha: 0.35)),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x0D000000),
+                                  blurRadius: 8,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(8),
@@ -578,27 +750,150 @@ class DashboardScreen extends ConsumerWidget {
                                     color: colors.brandAccentBg,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: Icon(Icons.account_tree_outlined, color: colors.brandAccent, size: 20),
+                                  child: Icon(Icons.bolt_rounded, color: colors.brandAccent, size: 20),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
-                                  child: Text(
-                                    'Cuentas Banco y Bolsillos',
-                                    style: AppTypography.sectionTitle.copyWith(color: colors.textPrimary),
-                                    overflow: TextOverflow.ellipsis,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        '⚡ Acciones Rápidas',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14,
+                                          color: colors.textPrimary,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Transferir, pagar TC, cuentas, suscripciones e IA',
+                                        style: TextStyle(
+                                          color: colors.textSecondary,
+                                          fontSize: 11,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                IconButton(
-                                  icon: Icon(Icons.add, size: 20, color: colors.brandAccent),
-                                  tooltip: 'Agregar Bolsillo',
-                                  onPressed: () => showDialog(context: context, builder: (_) => const PocketCrudDialog()),
-                                ),
+                                Icon(Icons.keyboard_arrow_down_rounded, color: colors.brandAccent, size: 22),
                               ],
                             ),
-                            const SizedBox(height: 16),
-                            Divider(color: colors.borderSubtle),
-                            const SizedBox(height: 16),
-                            accountsAsync.when(
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => showDialog(context: context, builder: (_) => const TransferDialog()),
+                          icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                          label: const Text('Transferir entre Bolsillos'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => showDialog(context: context, builder: (_) => const CardPaymentDialog()),
+                          icon: const Icon(Icons.payment_rounded, size: 18),
+                          label: const Text('Abonar a Tarjeta (Pagar TC)'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => showDialog(context: context, builder: (_) => const PocketCrudDialog()),
+                          icon: const Icon(Icons.folder_open_rounded, size: 18),
+                          label: const Text('Gestionar Cuentas Banco y Bolsillos'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => showDialog(context: context, builder: (_) => const CreditCardCrudDialog()),
+                          icon: const Icon(Icons.credit_card_rounded, size: 18),
+                          label: const Text('Gestionar Tarjetas de Crédito'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => showDialog(context: context, builder: (_) => const RecurringPaymentDialog()),
+                          icon: const Icon(Icons.autorenew_rounded, size: 18),
+                          label: const Text('Suscripciones y Recurrentes'),
+                        ),
+                        OutlinedButton.icon(
+                          key: const Key('dashboard_audit_expenses_button'),
+                          onPressed: () => showDialog(context: context, builder: (_) => const ExpenseAuditDialog()),
+                          icon: const Icon(Icons.troubleshoot_rounded, size: 18),
+                          label: const Text('Auditar Gastos Hormiga (IA)'),
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: 28),
+
+                  // --- Split View: Cuentas Banco & Bolsillos | Tarjetas de Crédito ---
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth >= 850;
+
+                      final accountsList = accountsAsync.value ?? [];
+                      final pocketsList = pocketsAsync.value ?? [];
+                      final totalAssets = pocketsList.fold<int>(0, (sum, p) => sum + p.balance);
+
+                      final accountsSection = Container(
+                        decoration: AppDecorations.card(
+                          backgroundColor: colors.surfaceCard,
+                          borderColor: colors.borderSubtle,
+                          borderRadius: 16,
+                        ),
+                        padding: EdgeInsets.all(isMobile ? 16.0 : 22.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            InkWell(
+                              key: const Key('dashboard_accounts_toggle_header'),
+                              borderRadius: BorderRadius.circular(10),
+                              onTap: isMobile
+                                  ? () => setState(() => _accountsExpanded = !_accountsExpanded)
+                                  : null,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: colors.brandAccentBg,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(Icons.account_tree_outlined, color: colors.brandAccent, size: 20),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        (isMobile && !_accountsExpanded)
+                                            ? 'Cuentas Banco (${accountsList.length}) · ${Formatters.cop(totalAssets)}'
+                                            : 'Cuentas Banco y Bolsillos',
+                                        style: AppTypography.sectionTitle.copyWith(color: colors.textPrimary),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (isMobile)
+                                      IconButton(
+                                        icon: Icon(
+                                          _accountsExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                          color: colors.textSecondary,
+                                          size: 24,
+                                        ),
+                                        onPressed: () => setState(() => _accountsExpanded = !_accountsExpanded),
+                                      ),
+                                    IconButton(
+                                      icon: Icon(Icons.add, size: 20, color: colors.brandAccent),
+                                      tooltip: 'Agregar Bolsillo',
+                                      onPressed: () => showDialog(context: context, builder: (_) => const PocketCrudDialog()),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            if (_accountsExpanded || !isMobile) ...[
+                              const SizedBox(height: 16),
+                              Divider(color: colors.borderSubtle),
+                              const SizedBox(height: 16),
+                              accountsAsync.when(
                               loading: () => const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator())),
                               error: (err, stack) => Text('Error: $err', style: TextStyle(color: colors.liabilityNegative)),
                               data: (accounts) {
@@ -745,10 +1040,14 @@ class DashboardScreen extends ConsumerWidget {
                                   },
                                 );
                               },
-                            ),
+                              ),
+                            ],
                           ],
                         ),
                       );
+
+                      final cardsList = cardsAsync.value ?? [];
+                      final totalDebt = cardsList.fold<int>(0, (sum, c) => sum + c.debt);
 
                       final cardsSection = Container(
                         decoration: AppDecorations.card(
@@ -756,39 +1055,61 @@ class DashboardScreen extends ConsumerWidget {
                           borderColor: colors.borderSubtle,
                           borderRadius: 16,
                         ),
-                        padding: const EdgeInsets.all(22.0),
+                        padding: EdgeInsets.all(isMobile ? 16.0 : 22.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: colors.liabilityNegativeBg,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Icon(Icons.credit_card_rounded, color: colors.liabilityNegative, size: 20),
+                            InkWell(
+                              key: const Key('dashboard_cards_toggle_header'),
+                              borderRadius: BorderRadius.circular(10),
+                              onTap: isMobile
+                                  ? () => setState(() => _cardsExpanded = !_cardsExpanded)
+                                  : null,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: colors.liabilityNegativeBg,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(Icons.credit_card_rounded, color: colors.liabilityNegative, size: 20),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        (isMobile && !_cardsExpanded)
+                                            ? 'Tarjetas (${cardsList.length}) · Deuda ${Formatters.cop(totalDebt)}'
+                                            : 'Tarjetas de Crédito',
+                                        style: AppTypography.sectionTitle.copyWith(color: colors.textPrimary),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (isMobile)
+                                      IconButton(
+                                        icon: Icon(
+                                          _cardsExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                          color: colors.textSecondary,
+                                          size: 24,
+                                        ),
+                                        onPressed: () => setState(() => _cardsExpanded = !_cardsExpanded),
+                                      ),
+                                    IconButton(
+                                      icon: Icon(Icons.add, size: 20, color: colors.brandAccent),
+                                      tooltip: 'Gestionar o Añadir Tarjeta',
+                                      onPressed: () => showDialog(context: context, builder: (_) => const CreditCardCrudDialog()),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'Tarjetas de Crédito',
-                                    style: AppTypography.sectionTitle.copyWith(color: colors.textPrimary),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: Icon(Icons.add, size: 20, color: colors.brandAccent),
-                                  tooltip: 'Gestionar o Añadir Tarjeta',
-                                  onPressed: () => showDialog(context: context, builder: (_) => const CreditCardCrudDialog()),
-                                ),
-                              ],
+                              ),
                             ),
-                            const SizedBox(height: 16),
-                            Divider(color: colors.borderSubtle),
-                            const SizedBox(height: 16),
-                            cardsAsync.when(
+                            if (_cardsExpanded || !isMobile) ...[
+                              const SizedBox(height: 16),
+                              Divider(color: colors.borderSubtle),
+                              const SizedBox(height: 16),
+                              cardsAsync.when(
                               loading: () => const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator())),
                               error: (err, stack) => Text('Error: $err', style: TextStyle(color: colors.liabilityNegative)),
                               data: (cards) {
@@ -892,7 +1213,14 @@ class DashboardScreen extends ConsumerWidget {
                                                 Row(
                                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                   children: [
-                                                    Text('Cupo Total:', style: TextStyle(fontSize: 12, color: colors.textSecondary)),
+                                                    Expanded(
+                                                      child: Text(
+                                                        'Cupo Total:',
+                                                        style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
                                                     Text(
                                                       Formatters.cop(c.creditLimit),
                                                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.textPrimary),
@@ -903,7 +1231,14 @@ class DashboardScreen extends ConsumerWidget {
                                                 Row(
                                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                   children: [
-                                                    Text('Cupo Disponible:', style: TextStyle(fontSize: 12, color: colors.textSecondary)),
+                                                    Expanded(
+                                                      child: Text(
+                                                        'Cupo Disponible:',
+                                                        style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
                                                     Text(
                                                       Formatters.cop(c.availableCredit),
                                                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: colors.assetPositive),
@@ -914,7 +1249,14 @@ class DashboardScreen extends ConsumerWidget {
                                                 Row(
                                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                   children: [
-                                                    Text('Deuda Actual:', style: TextStyle(fontSize: 12, color: colors.textSecondary)),
+                                                    Expanded(
+                                                      child: Text(
+                                                        'Deuda Actual:',
+                                                        style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
                                                     Text(
                                                       Formatters.cop(c.debt),
                                                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: colors.liabilityNegative),
@@ -987,8 +1329,9 @@ class DashboardScreen extends ConsumerWidget {
                               },
                             ),
                           ],
-                        ),
-                      );
+                        ],
+                      ),
+                    );
 
                       if (isWide) {
                         return Row(

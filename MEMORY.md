@@ -922,6 +922,37 @@ Este archivo conserva el contexto histórico, el estado técnico, las decisiones
   - **`flutter test`:** **159 de 159 tests pasando al 100% en verde** (0 fallos).
   - **`flutter analyze`:** **0 errores y 0 advertencias**.
 
+---
+
+## 27. Campo NLP Multilínea, Recordatorios con Monto Variable ($0 COP) y Paneles Acordeón Móviles — 2026-10-12
+
+### 27.1. Campo de Texto Multilínea en Diálogo NLP ([`lib/presentation/screens/dialogs/nlp_entry_dialog.dart`](file:///lib/presentation/screens/dialogs/nlp_entry_dialog.dart))
+- **Entrada Dinámica de Párrafo:** Configuración con `minLines: 2`, `maxLines: 8` y `keyboardType: TextInputType.multiline`, permitiendo que textos largos crezcan verticalmente en párrafo completo sin desplazarse lateralmente ni truncarse.
+- **Botón Ergonómico de Limpiar Texto:** Agregado botón táctil (`Key('nlp_clear_text_button')`) alineado en el `suffixIcon` junto al botón de dictado por voz para restablecer el formulario con un solo toque.
+
+### 27.2. Recordatorios de Servicios Públicos y Monto Variable ($0 COP)
+- **Edge Function Gemini v1beta ([`supabase/functions/finance_ai/index.ts`](file:///supabase/functions/finance_ai/index.ts)):**
+  - Prompt del sistema refinado para clasificar frases coloquiales ("recuérdame pagar", "recordar recibo", "factura de energía/luz/gas/agua/internet/arriendo") como `create_recurring`.
+  - Regla de negocio de monto variable: Si la frase omite la cantidad monetaria, la IA infiere `amount: 0` sin arrojar error ni requerir monto forzado. Desplegado a Supabase Edge Functions.
+- **Parser Local en Dart ([`lib/domain/services/nlp_parser.dart`](file:///lib/domain/services/nlp_parser.dart)):**
+  - Exclusión de tokens temporales (`los \d{1,2}`, `el \d{1,2}`, `cada \d{1,2}`) de la extracción de dinero para evitar falsos positivos en el monto.
+  - Tolerancia para `CreateRecurringIntent` con `amount: 0` asignando el día del mes inferido y deduciendo el nombre del servicio.
+- **Diálogos de Confirmación ([`nlp_entry_dialog.dart`](file:///lib/presentation/screens/dialogs/nlp_entry_dialog.dart) & [`recurring_payment_dialog.dart`](file:///lib/presentation/screens/dialogs/recurring_payment_dialog.dart)):**
+  - Muestra la insignia visual `"Monto Variable / Por Definir ($0 COP)"`.
+  - Acción adaptativa: el botón cambia a `"Guardar Recordatorio"` cuando el monto es 0 (o `"Crear Suscripción"` si monto > 0).
+  - Persistencia segura: permite guardar con monto $0 configurando `autoDeduct: amount > 0`.
+
+### 27.3. Paneles Colapsables y Botonera Comprimida en Móvil ([`lib/presentation/screens/dashboard_screen.dart`](file:///lib/presentation/screens/dashboard_screen.dart))
+- **Botonera "⚡ Acciones Rápidas":** En pantallas móviles (<600px), reemplaza los 6 botones dispersos por un botón de acción principal (`Key('dashboard_quick_actions_button')`) que despliega un Modal Bottom Sheet estilizado con las opciones: Transferir, Pagar TC, Gestionar Cuentas, Gestionar Tarjetas, Suscripciones y Auditar Fugas con IA.
+- **Acordeón Colapsable:**
+  - "Cuentas Banco y Bolsillos" desplegada por defecto en móvil; "Tarjetas de Crédito" colapsada por defecto. Ambas alternables con un toque en el encabezado con flecha animada.
+  - Resumen compacto en la barra de título cuando el bloque está colapsado (ej. `"Cuentas Banco (1) · $ 500.000"` y `"Tarjetas (1) · Deuda $ 50.000"`).
+- **Prevención de Overflows:** Cajas de montos en tarjetas de crédito reforzadas con `Expanded` y `TextOverflow.ellipsis`, eliminando cualquier riesgo de desbordamiento en anchos angostos.
+
+### 27.4. Validación y Métricas de Calidad
+- **Pruebas Automatizadas:** **163 de 163 tests pasando al 100% en verde** (`flutter test`).
+- **Análisis Estático:** **0 errores y 0 advertencias** (`flutter analyze`).
+
 
 
 
