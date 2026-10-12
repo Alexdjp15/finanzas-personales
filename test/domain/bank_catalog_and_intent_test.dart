@@ -108,7 +108,7 @@ void main() {
       expect(intent.name, 'Netflix');
       expect(intent.amount, 45000);
       expect(intent.dayOfMonth, 15);
-      expect(intent.sourceName?.toLowerCase(), 'nequi');
+      expect(intent.sourceName.toLowerCase(), 'nequi');
       expect(parsed.amount, 45000);
     });
   });
