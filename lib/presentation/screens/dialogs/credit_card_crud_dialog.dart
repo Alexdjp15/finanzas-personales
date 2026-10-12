@@ -308,14 +308,17 @@ class _CreditCardCrudDialogState extends ConsumerState<CreditCardCrudDialog> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    _editingCard != null
-                                        ? 'Editar Tarjeta de Crédito'
-                                        : 'Nueva Tarjeta de Crédito',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: palette.liabilityNegative,
+                                  Expanded(
+                                    child: Text(
+                                      _editingCard != null
+                                          ? 'Editar Tarjeta de Crédito'
+                                          : 'Nueva Tarjeta de Crédito',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: palette.liabilityNegative,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   IconButton(
@@ -343,108 +346,190 @@ class _CreditCardCrudDialogState extends ConsumerState<CreditCardCrudDialog> {
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: DropdownButtonFormField<String>(
-                                      isExpanded: true,
-                                      initialValue: _franchise,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Franquicia',
-                                      ),
-                                      items: const [
-                                        DropdownMenuItem(value: 'Visa', child: Text('Visa')),
-                                        DropdownMenuItem(value: 'Mastercard', child: Text('Mastercard')),
-                                        DropdownMenuItem(value: 'American Express', child: Text('American Express')),
-                                        DropdownMenuItem(value: 'Diners Club', child: Text('Diners Club')),
-                                        DropdownMenuItem(value: 'Otra', child: Text('Otra')),
-                                      ],
-                                      onChanged: (v) {
-                                        if (v != null) setState(() => _franchise = v);
-                                      },
-                                    ),
+                              if (mediaQuery.size.width < 440) ...[
+                                DropdownButtonFormField<String>(
+                                  isExpanded: true,
+                                  initialValue: _franchise,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Franquicia',
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _lastFourController,
-                                      maxLength: 4,
-                                      keyboardType: TextInputType.number,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Últimos 4 dígitos',
-                                        hintText: '1234',
+                                  items: const [
+                                    DropdownMenuItem(value: 'Visa', child: Text('Visa')),
+                                    DropdownMenuItem(value: 'Mastercard', child: Text('Mastercard')),
+                                    DropdownMenuItem(value: 'American Express', child: Text('American Express')),
+                                    DropdownMenuItem(value: 'Diners Club', child: Text('Diners Club')),
+                                    DropdownMenuItem(value: 'Otra', child: Text('Otra')),
+                                  ],
+                                  onChanged: (v) {
+                                    if (v != null) setState(() => _franchise = v);
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: _lastFourController,
+                                  maxLength: 4,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Últimos 4 dígitos',
+                                    hintText: '1234',
+                                    counterText: '',
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: _limitController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Cupo Total',
+                                    prefixText: r'$ ',
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: _availableController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Cupo Disponible',
+                                    prefixText: r'$ ',
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<int>(
+                                  isExpanded: true,
+                                  initialValue: _cutOffDay,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Día de corte',
+                                  ),
+                                  items: [
+                                    for (int i = 1; i <= 31; i++)
+                                      DropdownMenuItem(value: i, child: Text('Día $i')),
+                                  ],
+                                  onChanged: (v) {
+                                    if (v != null) setState(() => _cutOffDay = v);
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<int>(
+                                  isExpanded: true,
+                                  initialValue: _paymentDueDay,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Día de pago',
+                                  ),
+                                  items: [
+                                    for (int i = 1; i <= 31; i++)
+                                      DropdownMenuItem(value: i, child: Text('Día $i')),
+                                  ],
+                                  onChanged: (v) {
+                                    if (v != null) setState(() => _paymentDueDay = v);
+                                  },
+                                ),
+                              ] else ...[
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: DropdownButtonFormField<String>(
+                                        isExpanded: true,
+                                        initialValue: _franchise,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Franquicia',
+                                        ),
+                                        items: const [
+                                          DropdownMenuItem(value: 'Visa', child: Text('Visa')),
+                                          DropdownMenuItem(value: 'Mastercard', child: Text('Mastercard')),
+                                          DropdownMenuItem(value: 'American Express', child: Text('American Express')),
+                                          DropdownMenuItem(value: 'Diners Club', child: Text('Diners Club')),
+                                          DropdownMenuItem(value: 'Otra', child: Text('Otra')),
+                                        ],
+                                        onChanged: (v) {
+                                          if (v != null) setState(() => _franchise = v);
+                                        },
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _limitController,
-                                      keyboardType: TextInputType.number,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Cupo Total COP',
-                                        prefixText: '\$ ',
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _lastFourController,
+                                        maxLength: 4,
+                                        keyboardType: TextInputType.number,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Últimos 4 dígitos',
+                                          hintText: '1234',
+                                          counterText: '',
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _availableController,
-                                      keyboardType: TextInputType.number,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Cupo Disponible COP',
-                                        prefixText: '\$ ',
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _limitController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Cupo Total',
+                                          prefixText: r'$ ',
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: DropdownButtonFormField<int>(
-                                      isExpanded: true,
-                                      initialValue: _cutOffDay,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Día de corte',
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _availableController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Cupo Disponible',
+                                          prefixText: r'$ ',
+                                        ),
                                       ),
-                                      items: [
-                                        for (int i = 1; i <= 31; i++)
-                                          DropdownMenuItem(value: i, child: Text('Día $i')),
-                                      ],
-                                      onChanged: (v) {
-                                        if (v != null) setState(() => _cutOffDay = v);
-                                      },
                                     ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: DropdownButtonFormField<int>(
-                                      isExpanded: true,
-                                      initialValue: _paymentDueDay,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Día límite de pago',
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: DropdownButtonFormField<int>(
+                                        isExpanded: true,
+                                        initialValue: _cutOffDay,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Día de corte',
+                                        ),
+                                        items: [
+                                          for (int i = 1; i <= 31; i++)
+                                            DropdownMenuItem(value: i, child: Text('Día $i')),
+                                        ],
+                                        onChanged: (v) {
+                                          if (v != null) setState(() => _cutOffDay = v);
+                                        },
                                       ),
-                                      items: [
-                                        for (int i = 1; i <= 31; i++)
-                                          DropdownMenuItem(value: i, child: Text('Día $i')),
-                                      ],
-                                      onChanged: (v) {
-                                        if (v != null) setState(() => _paymentDueDay = v);
-                                      },
                                     ),
-                                  ),
-                                ],
-                              ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: DropdownButtonFormField<int>(
+                                        isExpanded: true,
+                                        initialValue: _paymentDueDay,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Día de pago',
+                                        ),
+                                        items: [
+                                          for (int i = 1; i <= 31; i++)
+                                            DropdownMenuItem(value: i, child: Text('Día $i')),
+                                        ],
+                                        onChanged: (v) {
+                                          if (v != null) setState(() => _paymentDueDay = v);
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                               const SizedBox(height: 16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
+                              Wrap(
+                                alignment: WrapAlignment.end,
+                                spacing: 8,
+                                runSpacing: 8,
                                 children: [
                                   TextButton(
                                     onPressed: () => setState(() {
@@ -453,7 +538,6 @@ class _CreditCardCrudDialogState extends ConsumerState<CreditCardCrudDialog> {
                                     }),
                                     child: Text('Cancelar', style: TextStyle(color: palette.textSecondary)),
                                   ),
-                                  const SizedBox(width: 8),
                                   ElevatedButton(
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: palette.liabilityNegative,

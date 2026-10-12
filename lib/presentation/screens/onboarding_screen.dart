@@ -456,7 +456,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               child: Container(
                 decoration: AppDecorations.card(context: context, borderRadius: 20),
                 child: Padding(
-                  padding: const EdgeInsets.all(28.0),
+                  padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 500 ? 14.0 : 28.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -504,17 +504,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
                       // --- SECTION 1: CUENTAS BANCO Y BOLSILLOS ---
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          Icon(Icons.account_balance, color: palette.brandAccent, size: 20),
+                          const SizedBox(width: 8),
                           Expanded(
-                            child: Row(
-                              children: [
-                                Icon(Icons.account_balance, color: palette.brandAccent, size: 20),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text('Cuentas Banco y Bolsillos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: palette.textPrimary)),
-                                ),
-                              ],
+                            child: Text(
+                              'Cuentas Banco y Bolsillos',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: palette.textPrimary),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           TextButton.icon(
@@ -546,38 +543,50 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                             children: [
                               Row(
                                 children: [
+                                  BankLogoAvatar(bankName: acc.name, size: 28),
+                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Row(
-                                          children: [
-                                            BankLogoAvatar(bankName: acc.name, size: 32),
-                                            const SizedBox(width: 8),
-                                            Text(acc.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: palette.textPrimary)),
-                                          ],
+                                        Text(
+                                          acc.name,
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: palette.textPrimary),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                         if (acc.accountNumberController.text.isNotEmpty)
                                           Text(
                                             'N.º: ${acc.accountNumberController.text}',
-                                            style: TextStyle(fontSize: 12, color: palette.textSecondary),
+                                            style: TextStyle(fontSize: 11, color: palette.textSecondary),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                       ],
                                     ),
                                   ),
+                                  const SizedBox(width: 6),
                                   Text(
                                     Formatters.cop(accTotal),
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: palette.brandAccent),
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: palette.brandAccent),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 4),
                                   TextButton.icon(
                                     onPressed: () => _addPocketToAccount(acc),
-                                    icon: const Icon(Icons.add, size: 16),
-                                    label: const Text('Bolsillo', style: TextStyle(fontSize: 12)),
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                      visualDensity: VisualDensity.compact,
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    icon: const Icon(Icons.add, size: 14),
+                                    label: const Text('Bolsillo', style: TextStyle(fontSize: 11)),
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
                                     tooltip: 'Eliminar Cuenta Banco',
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+                                    visualDensity: VisualDensity.compact,
                                     onPressed: () {
                                       setState(() => _accounts.remove(acc));
                                     },
@@ -676,17 +685,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
                       // --- SECTION 2: TARJETAS DE CRÉDITO ---
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          Icon(Icons.credit_card, color: palette.liabilityNegative, size: 20),
+                          const SizedBox(width: 8),
                           Expanded(
-                            child: Row(
-                              children: [
-                                Icon(Icons.credit_card, color: palette.liabilityNegative, size: 20),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text('Tarjetas de Crédito', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: palette.textPrimary)),
-                                ),
-                              ],
+                            child: Text(
+                              'Tarjetas de Crédito',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: palette.textPrimary),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           TextButton.icon(
@@ -835,8 +841,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: palette.borderSubtle),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        child: Wrap(
+                          alignment: WrapAlignment.spaceAround,
+                          runAlignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 16,
+                          runSpacing: 12,
                           children: [
                             Column(
                               children: [
@@ -848,7 +858,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                 ),
                               ],
                             ),
-                            Container(width: 1, height: 32, color: palette.borderSubtle),
                             Column(
                               children: [
                                 Text('Deuda Inicial', style: TextStyle(color: palette.textOnDarkMuted, fontSize: 12)),
@@ -859,7 +868,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                 ),
                               ],
                             ),
-                            Container(width: 1, height: 32, color: palette.borderSubtle),
                             Column(
                               children: [
                                 Text('Patrimonio Neto', style: TextStyle(color: palette.textOnDarkMuted, fontSize: 12)),

@@ -28,6 +28,7 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
   final _phraseController = TextEditingController();
   final _amountController = TextEditingController();
   final _descController = TextEditingController();
+  final _recurringDayController = TextEditingController();
 
   TransactionKind _kind = TransactionKind.expense;
   SourceType? _sourceType;
@@ -118,6 +119,10 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
       if (parsed.amount != null) {
         _amountController.text = parsed.amount.toString();
       }
+      if (parsed.intent is CreateRecurringIntent) {
+        _recurringDayController.text =
+            (parsed.intent as CreateRecurringIntent).dayOfMonth?.toString() ?? '1';
+      }
       _descController.text = text.trim();
     });
 
@@ -154,6 +159,10 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
               _isAiAnalyzed = true;
               if (aiResult.amount != null) {
                 _amountController.text = aiResult.amount.toString();
+              }
+              if (aiResult.intent is CreateRecurringIntent) {
+                _recurringDayController.text =
+                    (aiResult.intent as CreateRecurringIntent).dayOfMonth?.toString() ?? '1';
               }
             });
           }
@@ -265,10 +274,13 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
             : (rIntent.sourceId ?? defaultPocket?.id ?? '');
         final pocketId = defaultPocket?.id ?? '';
 
+        final enteredDay = int.tryParse(_recurringDayController.text.trim()) ?? (rIntent.dayOfMonth ?? 1);
+        final dayOfMonth = enteredDay.clamp(1, 31);
+
         await repo.createRecurringPayment(
           name: rIntent.name,
           amount: amount > 0 ? amount : (rIntent.amount ?? 50000),
-          dayOfMonth: rIntent.dayOfMonth ?? 1,
+          dayOfMonth: dayOfMonth,
           startDate: DateTime.now(),
           methodType: isCard ? PaymentMethodType.creditCard : PaymentMethodType.accountPocket,
           methodId: methodId,
@@ -423,6 +435,7 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
     _phraseController.dispose();
     _amountController.dispose();
     _descController.dispose();
+    _recurringDayController.dispose();
     super.dispose();
   }
 
@@ -712,6 +725,37 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
                                   ),
                                 ),
                               ],
+                            ),
+                            const SizedBox(height: 10),
+                            TextFormField(
+                              key: const Key('recurring_day_field'),
+                              controller: _recurringDayController,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: 'Día de cobro mensual (1-31)',
+                                hintText: '1 - 31',
+                                prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              ),
+                              onChanged: (val) {
+                                final d = int.tryParse(val.trim());
+                                if (d != null && _intent is CreateRecurringIntent) {
+                                  setState(() {
+                                    final cur = _intent as CreateRecurringIntent;
+                                    _intent = CreateRecurringIntent(
+                                      name: cur.name,
+                                      amount: cur.amount,
+                                      dayOfMonth: d.clamp(1, 31),
+                                      sourceName: cur.sourceName,
+                                      isCard: cur.isCard,
+                                      sourceId: cur.sourceId,
+                                      pocketId: cur.pocketId,
+                                    );
+                                  });
+                                }
+                              },
                             ),
                           ],
                         ),

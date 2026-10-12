@@ -877,6 +877,52 @@ Este archivo conserva el contexto histórico, el estado técnico, las decisiones
   - Workflow #3 (`38212889574`) completado exitosamente con check verde en todas las fases (`build-and-deploy` en 2m3s y `deploy-to-pages` en 8s).
   - Petición HTTP a `https://alexdjp15.github.io/finanzas-personales/` respondió con `HTTP/1.1 200 OK` y `<title>Finanzas Personales - APF</title>`.
 
+---
+
+## 26. Correcciones de Responsividad Móvil (Overflows/Layout), Campo Editable de Suscripción en NLP y Alineación de Esquema Gemini API v1beta — 2026-10-12
+
+### 26.1. Corrección de Error 400 INVALID_ARGUMENT en Gemini API ([`supabase/functions/finance_ai/index.ts`](file:///supabase/functions/finance_ai/index.ts))
+- **Diagnóstico:** El endpoint REST v1beta de Google AI Studio (`models/gemini-2.0-flash:generateContent`) arrojaba error `400 INVALID_ARGUMENT: Unknown field` cuando se incluían atributos no soportados como `thinkingConfig` en `generationConfig`.
+- **Solución Implementada:**
+  - Alineación estricta con la especificación Gemini v1beta REST:
+    * `contents: [{ role: "user", parts: [{ text: promptCompleto }] }]`
+    * `systemInstruction: { parts: [{ text: systemPrompt }] }` en camelCase estándar.
+    * `generationConfig: { temperature: 0.2, maxOutputTokens: 1000, responseMimeType: "application/json" }`.
+  - Despliegue automático a producción de Supabase Edge Functions (`npx supabase functions deploy finance_ai`).
+  - Verificación en vivo: parsing de jerga colombiana ejecutado en <800ms respondiendo HTTP 200 con esquema JSON estricto.
+
+### 26.2. Día de Cobro Mensual Editable en NLP ([`lib/presentation/screens/dialogs/nlp_entry_dialog.dart`](file:///lib/presentation/screens/dialogs/nlp_entry_dialog.dart))
+- **Controlador Dinámico:** Se introdujo `_recurringDayController` vinculado en tiempo real a la detección de `CreateRecurringIntent`.
+- **Campo Visible y Editable:**
+  - `TextFormField` con clave `Key('recurring_day_field')` y etiqueta `"Día de cobro mensual (1-31)"`.
+  - Si la frase menciona un día (ej. `"cada 15"`), el campo se precarga automáticamente con dicho valor, permitiendo al usuario cambiarlo libremente antes de pulsar `"Confirmar Suscripción"`.
+  - Al enviar, el valor se procesa y asegura dentro del rango válido `1 <= dayOfMonth <= 31`.
+
+### 26.3. AppBar Responsivo y Anti-Colisiones ([`lib/presentation/screens/dashboard_screen.dart`](file:///lib/presentation/screens/dashboard_screen.dart))
+- **Adaptación Móvil (<600px):**
+  - Título acortado limpiamente a `"Finanzas"` envuelto en `Flexible` con `TextOverflow.ellipsis`.
+  - Iconos de acción (tema, alertas, alarmas, cierre fiscal, logout) compactados con `padding: EdgeInsets.zero`, restricciones tight de `32x32px` e iconos de `20px`.
+  - Insignia de `"POSICIÓN FINANCIERA NETA"` ajustada con `Flexible` y `ellipsis`.
+  - Encabezados de secciones con `Expanded` eliminando el uso de `Spacer()` rígidos.
+
+### 26.4. Textos Completos y Apilado Vertical en Diálogos de Tarjetas ([`lib/presentation/screens/dialogs/credit_card_crud_dialog.dart`](file:///lib/presentation/screens/dialogs/credit_card_crud_dialog.dart) & [`card_details_dialog.dart`](file:///lib/presentation/screens/dialogs/card_details_dialog.dart))
+- **Etiquetas Sin Puntos Suspensivos:** Sustitución de etiquetas cortadas por nombres completos: `"Últimos 4 dígitos"`, `"Cupo Total"`, `"Cupo Disponible"`, `"Día de pago"`, `"Día de corte"`.
+- **Apilado Adaptativo:** En pantallas <440px, las parejas de campos horizontales se transforman automáticamente en columnas verticales de ancho completo.
+- **Botones con Wrap:** Fila de acciones convertida a `Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 8)` eliminando cualquier desbordamiento de píxeles (`RenderFlex overflow`).
+
+### 26.5. Corrección de Superposición en Onboarding ([`lib/presentation/screens/onboarding_screen.dart`](file:///lib/presentation/screens/onboarding_screen.dart))
+- **Estructura Flexible:**
+  - `BankLogoAvatar` colocado directamente en el `Row` principal junto a `Expanded` para el nombre del banco, impidiendo solapamientos.
+  - Padding responsivo (`14px` en móviles <500px vs `28px` en desktop).
+  - Barra resumen convertida a `Wrap` para visualización limpia en anchos angostos.
+
+### 26.6. Validación SDD
+- **Nueva Suite de Pruebas:** [`test/presentation/screens/mobile_layout_and_nlp_day_test.dart`](file:///test/presentation/screens/mobile_layout_and_nlp_day_test.dart) verificando AppBar móvil, botones compactos, apilado de formularios, onboarding responsivo y campo editable de día recurrente en NLP.
+- **Resultados de Calidad:**
+  - **`flutter test`:** **159 de 159 tests pasando al 100% en verde** (0 fallos).
+  - **`flutter analyze`:** **0 errores y 0 advertencias**.
+
+
 
 
 

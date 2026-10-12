@@ -36,6 +36,11 @@ class DashboardScreen extends ConsumerWidget {
     final colors = AppColors.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+    final iconPadding = isMobile ? EdgeInsets.zero : const EdgeInsets.all(8);
+    final iconConstraints = isMobile ? const BoxConstraints.tightFor(width: 32, height: 32) : null;
+    final iconSize = isMobile ? 20.0 : 24.0;
+
     return Scaffold(
       backgroundColor: colors.surfaceBase,
       appBar: AppBar(
@@ -47,14 +52,15 @@ class DashboardScreen extends ConsumerWidget {
           child: Divider(height: 1, color: colors.borderSubtle),
         ),
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              height: 38,
-              width: 38,
+              height: isMobile ? 32 : 38,
+              width: isMobile ? 32 : 38,
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
                 border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
                 boxShadow: const [
                   BoxShadow(
@@ -65,18 +71,21 @@ class DashboardScreen extends ConsumerWidget {
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(7),
-                child: const AppLogoWidget(size: 32, useIsotype: true),
+                borderRadius: BorderRadius.circular(isMobile ? 5 : 7),
+                child: AppLogoWidget(size: isMobile ? 26 : 32, useIsotype: true),
               ),
             ),
-            const SizedBox(width: 12),
-            Text(
-              'Finanzas Personales',
-              style: TextStyle(
-                color: colors.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-                letterSpacing: -0.4,
+            SizedBox(width: isMobile ? 8 : 12),
+            Flexible(
+              child: Text(
+                isMobile ? 'Finanzas' : 'Finanzas Personales',
+                style: TextStyle(
+                  color: colors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: isMobile ? 16 : 18,
+                  letterSpacing: -0.4,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -84,6 +93,9 @@ class DashboardScreen extends ConsumerWidget {
         actions: [
           // Theme Switcher (Dark / Light)
           IconButton(
+            padding: iconPadding,
+            constraints: iconConstraints,
+            iconSize: iconSize,
             icon: Icon(
               isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
               color: colors.textSecondary,
@@ -99,16 +111,19 @@ class DashboardScreen extends ConsumerWidget {
               alignment: Alignment.center,
               children: [
                 IconButton(
+                  padding: iconPadding,
+                  constraints: iconConstraints,
+                  iconSize: iconSize,
                   icon: Icon(Icons.notifications_outlined, color: colors.textSecondary),
                   tooltip: 'Notificaciones y Alertas',
                   onPressed: () => showDialog(context: context, builder: (_) => const InAppAlertsSheet()),
                 ),
                 if (alerts.isNotEmpty)
                   Positioned(
-                    top: 8,
-                    right: 8,
+                    top: isMobile ? 2 : 8,
+                    right: isMobile ? 2 : 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                       decoration: BoxDecoration(
                         color: colors.liabilityNegative,
                         borderRadius: BorderRadius.circular(10),
@@ -117,7 +132,7 @@ class DashboardScreen extends ConsumerWidget {
                         '${alerts.length}',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -129,16 +144,25 @@ class DashboardScreen extends ConsumerWidget {
             error: (error, stack) => const SizedBox.shrink(),
           ),
           IconButton(
+            padding: iconPadding,
+            constraints: iconConstraints,
+            iconSize: iconSize,
             icon: Icon(Icons.alarm_rounded, color: colors.textSecondary),
             tooltip: 'Configurar Hora de Alertas',
             onPressed: () => showDialog(context: context, builder: (_) => const ReminderSettingsDialog()),
           ),
           IconButton(
+            padding: iconPadding,
+            constraints: iconConstraints,
+            iconSize: iconSize,
             icon: Icon(Icons.archive_outlined, color: colors.textSecondary),
             tooltip: 'Cierre Fiscal Anual',
             onPressed: () => showDialog(context: context, builder: (_) => const FiscalCloseDialog()),
           ),
           IconButton(
+            padding: iconPadding,
+            constraints: iconConstraints,
+            iconSize: iconSize,
             icon: Icon(Icons.logout_rounded, color: colors.liabilityNegative),
             tooltip: 'Cerrar Sesión',
             onPressed: () async {
@@ -146,7 +170,7 @@ class DashboardScreen extends ConsumerWidget {
               await authRepo.signOut();
             },
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: isMobile ? 6 : 12),
         ],
       ),
       body: RefreshIndicator(
@@ -381,22 +405,26 @@ class DashboardScreen extends ConsumerWidget {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.12),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: const Text(
-                                        'POSICIÓN FINANCIERA NETA',
-                                        style: TextStyle(
-                                          color: AppColors.textOnDark,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: 0.8,
+                                    Flexible(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: const Text(
+                                          'POSICIÓN FINANCIERA NETA',
+                                          style: TextStyle(
+                                            color: AppColors.textOnDark,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.8,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ),
+                                    const SizedBox(width: 8),
                                     const Icon(Icons.account_balance_rounded, color: Colors.white54, size: 20),
                                   ],
                                 ),
@@ -553,11 +581,13 @@ class DashboardScreen extends ConsumerWidget {
                                   child: Icon(Icons.account_tree_outlined, color: colors.brandAccent, size: 20),
                                 ),
                                 const SizedBox(width: 12),
-                                Text(
-                                  'Cuentas Banco y Bolsillos',
-                                  style: AppTypography.sectionTitle.copyWith(color: colors.textPrimary),
+                                Expanded(
+                                  child: Text(
+                                    'Cuentas Banco y Bolsillos',
+                                    style: AppTypography.sectionTitle.copyWith(color: colors.textPrimary),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                                const Spacer(),
                                 IconButton(
                                   icon: Icon(Icons.add, size: 20, color: colors.brandAccent),
                                   tooltip: 'Agregar Bolsillo',
@@ -741,11 +771,13 @@ class DashboardScreen extends ConsumerWidget {
                                   child: Icon(Icons.credit_card_rounded, color: colors.liabilityNegative, size: 20),
                                 ),
                                 const SizedBox(width: 12),
-                                Text(
-                                  'Tarjetas de Crédito',
-                                  style: AppTypography.sectionTitle.copyWith(color: colors.textPrimary),
+                                Expanded(
+                                  child: Text(
+                                    'Tarjetas de Crédito',
+                                    style: AppTypography.sectionTitle.copyWith(color: colors.textPrimary),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                                const Spacer(),
                                 IconButton(
                                   icon: Icon(Icons.add, size: 20, color: colors.brandAccent),
                                   tooltip: 'Gestionar o Añadir Tarjeta',

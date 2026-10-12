@@ -45,16 +45,15 @@ interface AuditExpensesRequest {
 type AiRequest = ParseIntentRequest | ChatCopilotRequest | AuditExpensesRequest;
 
 async function callGemini(payload: Record<string, unknown>, apiKey: string): Promise<Record<string, unknown>> {
-  const preferredModel = (Deno.env.get("GEMINI_MODEL") || "gemini-flash-lite-latest").trim().replace(/^models\//, "");
+  const preferredModel = (Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash").trim().replace(/^models\//, "");
 
   // Model candidates with automatic fallback in case of deprecation (404), overload (503), or quota limits (429)
-  // Prioritizing Flash-Lite for instant latency (<700ms) and high free-tier availability.
   const candidateModels = [
     preferredModel,
-    "gemini-flash-lite-latest",
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
+    "gemini-2.0-flash",
     "gemini-flash-latest",
+    "gemini-3.5-flash-lite",
+    "gemini-flash-lite-latest",
     "gemini-3.5-flash",
     "gemini-3.8-flash",
   ].filter((v, idx, arr) => arr.indexOf(v) === idx);
@@ -188,15 +187,17 @@ Debes responder ÚNICAMENTE con un JSON válido sin markdown ni comillas triples
 }`;
 
       const geminiJson: any = await callGemini({
-        contents: [{ parts: [{ text: `Entrada del usuario: "${text}"` }] }],
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `Entrada del usuario: "${text}"` }],
+          },
+        ],
         systemInstruction: { parts: [{ text: systemPrompt }] },
         generationConfig: {
           temperature: 0.1,
-          responseMimeType: "application/json",
           maxOutputTokens: 2048,
-          thinkingConfig: {
-            thinkingBudget: 0,
-          },
+          responseMimeType: "application/json",
         },
       }, apiKey);
 
@@ -246,9 +247,6 @@ Reglas:
         generationConfig: {
           temperature: 0.3,
           maxOutputTokens: 2048,
-          thinkingConfig: {
-            thinkingBudget: 0,
-          },
         },
       }, apiKey);
 
@@ -294,15 +292,17 @@ Responde ÚNICAMENTE en JSON válido:
       const dataPayload = JSON.stringify({ transactions, pockets, cards }, null, 2);
 
       const geminiJson: any = await callGemini({
-        contents: [{ parts: [{ text: `Datos para auditoría:\n${dataPayload}` }] }],
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `Datos para auditoría:\n${dataPayload}` }],
+          },
+        ],
         systemInstruction: { parts: [{ text: systemPrompt }] },
         generationConfig: {
           temperature: 0.2,
-          responseMimeType: "application/json",
           maxOutputTokens: 2048,
-          thinkingConfig: {
-            thinkingBudget: 0,
-          },
+          responseMimeType: "application/json",
         },
       }, apiKey);
 
