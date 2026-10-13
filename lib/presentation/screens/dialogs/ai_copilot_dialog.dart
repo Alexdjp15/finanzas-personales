@@ -8,6 +8,41 @@ import '../../utils/formatters.dart';
 class AiCopilotDialog extends ConsumerStatefulWidget {
   const AiCopilotDialog({super.key});
 
+  /// Displays Sof.IA chat dialog with smooth scale and fade transition.
+  static Future<void> show(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+    return showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Cerrar Sof.IA',
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (ctx, anim1, anim2) => const AiCopilotDialog(),
+      transitionBuilder: (ctx, anim, secondaryAnim, child) {
+        final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        if (isMobile) {
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.2),
+              end: Offset.zero,
+            ).animate(curved),
+            child: FadeTransition(
+              opacity: curved,
+              child: child,
+            ),
+          );
+        }
+        return ScaleTransition(
+          scale: Tween<double>(begin: 0.92, end: 1.0).animate(curved),
+          child: FadeTransition(
+            opacity: curved,
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
   @override
   ConsumerState<AiCopilotDialog> createState() => _AiCopilotDialogState();
 }
@@ -36,7 +71,8 @@ class _AiCopilotDialogState extends ConsumerState<AiCopilotDialog> {
     super.initState();
     _messages.add(const _ChatMessage(
       isUser: false,
-      text: '¡Hola! Soy tu Copiloto Financiero IA. Conozco tus cuentas, bolsillos y tarjetas de crédito en tiempo real. ¿En qué te puedo asesorar hoy?',
+      text:
+          '¡Hola! Soy Sof.IA, tu asistente financiera personal. Analizo tus cuentas y bolsillos en tiempo real. ¿Qué te gustaría consultar o planear hoy?',
     ));
   }
 
@@ -127,7 +163,7 @@ class _AiCopilotDialogState extends ConsumerState<AiCopilotDialog> {
           '• Patrimonio Neto: ${Formatters.cop(totals?.netWorth ?? 0)}\n'
           '• Total Activos: ${Formatters.cop(totals?.totalAssets ?? 0)}\n'
           '• Total Deuda Tarjetas: ${Formatters.cop(totals?.totalDebt ?? 0)}\n\n'
-          'Nota: ${e.toString().replaceAll("Exception: ", "")}. Si configuraste GEMINI_API_KEY en Supabase, el asistente responderá con análisis profundo.';
+          'Nota: ${e.toString().replaceAll("Exception: ", "")}. Si configuraste GEMINI_API_KEY en Supabase, Sof.IA responderá con análisis profundo.';
 
       setState(() {
         _messages.add(_ChatMessage(isUser: false, text: fallbackText));
@@ -144,30 +180,75 @@ class _AiCopilotDialogState extends ConsumerState<AiCopilotDialog> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final mediaQuery = MediaQuery.of(context);
+    final isMobile = mediaQuery.size.width < 600;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      alignment: isMobile ? Alignment.bottomCenter : Alignment.center,
+      insetPadding: isMobile
+          ? const EdgeInsets.only(top: 48)
+          : const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+      backgroundColor: palette.surfaceCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: isMobile
+            ? const BorderRadius.vertical(top: Radius.circular(24))
+            : BorderRadius.circular(20),
+      ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: 620,
           maxHeight: mediaQuery.size.height * 0.85,
         ),
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16.0 : 20.0,
+            vertical: isMobile ? 14.0 : 20.0,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (isMobile) ...[
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: palette.borderSubtle,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ],
+
               // Header
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
-                      color: palette.brandAccentBg,
                       shape: BoxShape.circle,
-                      border: Border.all(color: palette.brandAccent.withValues(alpha: 0.3)),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFF3B82F6), // Azul vibrante
+                          Color(0xFF8B5CF6), // Púrpura eléctrico
+                          Color(0xFF06B6D4), // Cian luminoso
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    child: Icon(Icons.auto_awesome, color: palette.brandAccent, size: 22),
+                    child: const Center(
+                      child: Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -175,22 +256,24 @@ class _AiCopilotDialogState extends ConsumerState<AiCopilotDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Copiloto Financiero IA',
+                          'Sof.IA',
                           style: TextStyle(
-                            fontSize: 17,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: palette.textPrimary,
+                            letterSpacing: -0.3,
                           ),
                         ),
                         Text(
-                          'Asesor personal con Gemini Flash y contexto de tus balances',
+                          'Tu asesora financiera inteligente',
                           style: TextStyle(fontSize: 12, color: palette.textSecondary),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Cerrar',
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -235,7 +318,7 @@ class _AiCopilotDialogState extends ConsumerState<AiCopilotDialog> {
                         child: Container(
                           margin: const EdgeInsets.symmetric(vertical: 6),
                           padding: const EdgeInsets.all(12),
-                          constraints: BoxConstraints(maxWidth: mediaQuery.size.width * 0.7),
+                          constraints: BoxConstraints(maxWidth: mediaQuery.size.width * 0.75),
                           decoration: BoxDecoration(
                             color: m.isUser ? palette.brandAccent : palette.surfaceCard,
                             borderRadius: BorderRadius.circular(12),
@@ -269,7 +352,7 @@ class _AiCopilotDialogState extends ConsumerState<AiCopilotDialog> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Gemini Flash está analizando tus finanzas...',
+                      'Sof.IA está analizando tus finanzas...',
                       style: TextStyle(fontSize: 12, color: palette.textSecondary, fontStyle: FontStyle.italic),
                     ),
                   ],
@@ -285,7 +368,7 @@ class _AiCopilotDialogState extends ConsumerState<AiCopilotDialog> {
                     child: TextField(
                       controller: _inputController,
                       decoration: InputDecoration(
-                        hintText: 'Pregúntale a tu copiloto financiero...',
+                        hintText: 'Pregúntale a Sof.IA...',
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       ),

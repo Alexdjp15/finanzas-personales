@@ -8,7 +8,7 @@ import '../widgets/charts/pocket_distribution_chart.dart';
 import '../widgets/dashboard_micro_widgets.dart';
 import '../widgets/bank_logo_avatar.dart';
 import '../widgets/app_logo_widget.dart';
-import 'dialogs/ai_copilot_dialog.dart';
+import '../widgets/sofia_floating_orb.dart';
 import 'dialogs/expense_audit_dialog.dart';
 import 'dialogs/bank_details_dialog.dart';
 import 'dialogs/card_details_dialog.dart';
@@ -299,6 +299,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     return Scaffold(
       backgroundColor: colors.surfaceBase,
+      floatingActionButton: const SofiaFloatingOrb(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       appBar: AppBar(
         backgroundColor: colors.surfaceCard,
         surfaceTintColor: Colors.transparent,
@@ -446,58 +448,53 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       borderColor: colors.borderSubtle,
                       borderRadius: 16,
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        final isCompact = constraints.maxWidth < 650;
-                        final actionButtons = Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: () => showDialog(context: context, builder: (_) => const NlpEntryDialog()),
-                              icon: const Icon(Icons.chat, size: 18),
-                              label: const Text('Ingreso Rápido por Frase'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: colors.brandAccent,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                elevation: 0,
-                              ),
+                        final isCompact = constraints.maxWidth < 620;
+
+                        final phraseButton = ElevatedButton.icon(
+                          key: const Key('dashboard_phrase_entry_button'),
+                          onPressed: () => showDialog(
+                            context: context,
+                            builder: (_) => const NlpEntryDialog(),
+                          ),
+                          icon: const Icon(Icons.edit_note_rounded, size: 18),
+                          label: const Text(
+                            'Ingreso por Frase',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colors.brandAccent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                        );
+
+                        final voiceButton = OutlinedButton.icon(
+                          key: const Key('dashboard_voice_dictation_button'),
+                          onPressed: () => showDialog(
+                            context: context,
+                            builder: (_) => const NlpEntryDialog(startListeningImmediately: true),
+                          ),
+                          icon: const Icon(Icons.mic_rounded, size: 18),
+                          label: const Text(
+                            'Dictar por Voz',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: colors.brandAccent,
+                            side: BorderSide(
+                              color: colors.brandAccent.withValues(alpha: 0.7),
+                              width: 1.4,
                             ),
-                            OutlinedButton.icon(
-                              key: const Key('dashboard_voice_dictation_button'),
-                              onPressed: () => showDialog(
-                                context: context,
-                                builder: (_) => const NlpEntryDialog(startListeningImmediately: true),
-                              ),
-                              icon: const Icon(Icons.mic, size: 18),
-                              label: const Text('Dictar por Voz'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: colors.brandAccent,
-                                side: BorderSide(color: colors.brandAccent),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                            OutlinedButton.icon(
-                              key: const Key('dashboard_ai_copilot_button'),
-                              onPressed: () => showDialog(
-                                context: context,
-                                builder: (_) => const AiCopilotDialog(),
-                              ),
-                              icon: const Icon(Icons.auto_awesome, size: 18),
-                              label: const Text('Copiloto IA'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: colors.brandAccent,
-                                side: BorderSide(color: colors.brandAccent.withValues(alpha: 0.5)),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                          ],
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
                         );
 
                         if (isCompact) {
@@ -507,33 +504,36 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               Row(
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.all(10),
+                                    padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
                                       color: colors.brandAccentBg,
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
-                                    child: Icon(Icons.auto_awesome, color: colors.brandAccent, size: 22),
+                                    child: Icon(Icons.auto_awesome, color: colors.brandAccent, size: 20),
                                   ),
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
-                                          'Ingreso Inteligente por NLP',
+                                          'Registro Inteligente',
                                           style: TextStyle(
                                             fontWeight: FontWeight.w700,
-                                            fontSize: 14,
+                                            fontSize: 15,
                                             color: colors.textPrimary,
+                                            letterSpacing: -0.2,
                                           ),
                                         ),
                                         Text(
-                                          'Escribe o dicta tus transacciones al instante.',
+                                          'Escribe o dicta tu movimiento',
                                           style: TextStyle(
                                             color: colors.textSecondary,
                                             fontSize: 12,
                                           ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ],
                                     ),
@@ -541,7 +541,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 ],
                               ),
                               const SizedBox(height: 12),
-                              actionButtons,
+                              Row(
+                                children: [
+                                  Expanded(child: phraseButton),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: voiceButton),
+                                ],
+                              ),
                             ],
                           );
                         }
@@ -556,23 +562,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               ),
                               child: Icon(Icons.auto_awesome, color: colors.brandAccent, size: 22),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    'Ingreso Inteligente por Lenguaje Natural',
+                                    'Registro Inteligente',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 14,
+                                      fontSize: 15,
                                       color: colors.textPrimary,
+                                      letterSpacing: -0.2,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '¿Hiciste un gasto o recibiste un abono? Regístralo al instante por frase o dictado de voz.',
+                                    'Escribe o dicta tu movimiento',
                                     style: TextStyle(
                                       color: colors.textSecondary,
                                       fontSize: 13,
@@ -583,8 +590,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            actionButtons,
+                            const SizedBox(width: 16),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                phraseButton,
+                                const SizedBox(width: 10),
+                                voiceButton,
+                              ],
+                            ),
                           ],
                         );
                       },

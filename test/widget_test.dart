@@ -100,7 +100,7 @@ void main() {
     expect(find.text('Activos Totales (Bancos)'), findsOneWidget);
     expect(find.text('Pasivos Totales (Tarjetas)'), findsOneWidget);
 
-    expect(find.text('Ingreso Rápido por Frase'), findsOneWidget);
+    expect(find.text('Ingreso por Frase'), findsOneWidget);
     expect(find.text('Transferir entre Bolsillos'), findsOneWidget);
     expect(find.text('Abonar a Tarjeta (Pagar TC)'), findsOneWidget);
 

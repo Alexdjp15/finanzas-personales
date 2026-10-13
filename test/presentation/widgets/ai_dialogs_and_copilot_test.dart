@@ -69,8 +69,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Copiloto Financiero IA'), findsOneWidget);
-      expect(find.textContaining('¡Hola! Soy tu Copiloto Financiero IA'), findsOneWidget);
+      expect(find.text('Sof.IA'), findsOneWidget);
+      expect(find.textContaining('¡Hola! Soy Sof.IA, tu asistente financiera personal'), findsOneWidget);
       expect(find.text('¿Cómo está mi patrimonio neto actual?'), findsOneWidget);
     });
 

@@ -1013,6 +1013,41 @@ Este archivo conserva el contexto histórico, el estado técnico, las decisiones
   - **`flutter test`:** **172 de 172 tests pasando al 100% en verde** (0 fallos).
   - **`flutter analyze`:** **0 errores y 0 advertencias**.
 
+---
+
+## 30. Rediseño Visual de la Barra de Registro Inteligente y Creación de la Esfera Flotante Sof.IA — 2026-10-12
+
+### 30.1. Rediseño de la Barra de Registro Rápido ([`lib/presentation/screens/dashboard_screen.dart`](file:///lib/presentation/screens/dashboard_screen.dart))
+- **Título y Subtítulo Concisos:** Encabezado simplificado a `"Registro Inteligente"` con subtítulo corto `"Escribe o dicta tu movimiento"`, libre de textos largos y truncaciones con elipsis.
+- **Eliminación del Botón Copiloto:** Removido definitivamente el botón redundante de la barra de comandos para otorgar todo el protagonismo a la nueva esfera flotante.
+- **Botonera de Alto Contraste:** Únicamente dos botones limpios:
+  1. `"Ingreso por Frase"`: Botón destacado con color acento de la marca e icono `Icons.edit_note_rounded`.
+  2. `"Dictar por Voz"`: Botón con estilo píldora, borde contrastado e icono `Icons.mic_rounded`.
+- **Distribución Móvil Equilibrada:** En pantallas móviles (`< 620px`), ambos botones se organizan en una fila balanceada con `Expanded` y `maxLines: 1`, evitando cualquier truncación o salto de línea.
+
+### 30.2. Creación del Widget Interactivo "Sof.IA" ([`lib/presentation/widgets/sofia_floating_orb.dart`](file:///lib/presentation/widgets/sofia_floating_orb.dart))
+- **Identidad Visual:** Contenedor esférico de 60px con gradiente tricolor vibrante (azul eléctrico `#2563EB`, púrpura `#7C3AED` y cian `#06B6D4`), icono central de destellos `Icons.auto_awesome` y múltiple sombra difusa de brillo (*glow*).
+- **Animación de Reposo (*Breathing / Pulse*):** `AnimationController` con variación suave de escala (1.0 a 1.06) y halo exterior de opacidad dinámica (0.25 a 0.65).
+- **Micro-Interacción Elástica:** Reacciona al toque con una reducción elástica a 0.94 y recuperación inmediata al soltar, abriendo el diálogo de Sof.IA.
+- **Badge y Tooltip:** Incluye etiqueta flotante `"Sof.IA"` en la esquina superior y `Tooltip` explicativo `"Sof.IA · Tu asesora financiera"`.
+- **Control para Tests Automatizados:** Incorpora detección de entorno de test y flag estático `enablePulseInTests` para evitar bloqueos por tiempo de espera en `WidgetTester.pumpAndSettle()`.
+
+### 30.3. Renombramiento y Mejora del Chat de Sof.IA ([`lib/presentation/screens/dialogs/ai_copilot_dialog.dart`](file:///lib/presentation/screens/dialogs/ai_copilot_dialog.dart))
+- **Identidad Renovada:** Título `"Sof.IA"`, subtítulo `"Tu asesora financiera inteligente"` y avatar esférico con el mismo gradiente brillante.
+- **Saludo Personalizado:** `"¡Hola! Soy Sof.IA, tu asistente financiera personal. Analizo tus cuentas y bolsillos en tiempo real. ¿Qué te gustaría consultar o planear hoy?"`.
+- **Transición Fluida:** Implementado método estático `AiCopilotDialog.show(context)` utilizando `showGeneralDialog` con curvas `Curves.easeOutCubic`, escala y fade.
+- **Ergonomía en Móvil (< 600px):** Modal alineado a la parte inferior con bordes redondeados superiores (24px), barra táctil de arrastre superior y altura del 85% de la pantalla.
+
+### 30.4. Actualización del Backend y Prompt de Sistema ([`supabase/functions/finance_ai/index.ts`](file:///supabase/functions/finance_ai/index.ts))
+- **Acción `chat_copilot`:** System Prompt actualizado para que la IA se identifique formalmente como `"Sof.IA"`, una asesora financiera personal, cercana, estratégica y experta adaptada al contexto, modismos y realidad económica de Colombia.
+
+### 30.5. Validación y Suite de Pruebas
+- **Nuevas Pruebas ([`test/presentation/widgets/sofia_floating_orb_test.dart`](file:///test/presentation/widgets/sofia_floating_orb_test.dart)):** Cobertura completa del widget flotante, animaciones, callbacks de pulsación y renderizado responsivo en el Dashboard.
+- **Resultados de Calidad:**
+  - **`flutter test`:** **177 de 177 tests en verde (100% de éxito)**.
+  - **`flutter analyze`:** **0 advertencias / 0 errores**.
+
+
 
 
 
