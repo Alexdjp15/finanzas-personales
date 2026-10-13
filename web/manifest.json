@@ -31,5 +31,31 @@
             "type": "image/png",
             "purpose": "maskable"
         }
+    ],
+    "shortcuts": [
+        {
+            "name": "Dictar por Voz",
+            "short_name": "Voz",
+            "description": "Registrar transacción por comando de voz",
+            "url": "./?action=voice",
+            "icons": [
+                {
+                    "src": "icons/Icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Ingreso Rápido",
+            "short_name": "Texto",
+            "description": "Registrar transacción por frase natural",
+            "url": "./?action=nlp",
+            "icons": [
+                {
+                    "src": "icons/Icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        }
     ]
 }

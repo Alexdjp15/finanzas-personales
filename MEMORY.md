@@ -953,6 +953,31 @@ Este archivo conserva el contexto histórico, el estado técnico, las decisiones
 - **Pruebas Automatizadas:** **163 de 163 tests pasando al 100% en verde** (`flutter test`).
 - **Análisis Estático:** **0 errores y 0 advertencias** (`flutter analyze`).
 
+---
+
+## 28. Apertura Directa del Diálogo NLP vía Parámetro URL y Accesos Directos PWA — 2026-10-12
+
+### 28.1. Detección y Enrutamiento de Parámetros URL ([`lib/presentation/screens/dashboard_screen.dart`](file:///lib/presentation/screens/dashboard_screen.dart))
+- **Mecanismo de Extracción Robusto:** Implementación de `DashboardScreen.parseActionFromUri(Uri uri)` y `DashboardScreen.getUrlAction()` que analiza tanto parámetros directos (`?action=nlp`) como fragmentos hash (`/#/?action=voice` o `/#/dashboard?action=nlp`).
+- **Apertura Automatizada en Post-Frame:**
+  - En `initState()`, se programa `WidgetsBinding.instance.addPostFrameCallback` para garantizar que la pantalla esté montada.
+  - Si `action == 'nlp'`: Despliega automáticamente `NlpEntryDialog()`.
+  - Si `action == 'voice'`: Despliega automáticamente `NlpEntryDialog(startListeningImmediately: true)` activando la escucha de micrófono en vivo.
+- **Control de Ciclo de Vida:** Bandera booleana interna `_hasHandledUrlAction` que previene aperturas duplicadas ante re-renderizados o cambios de estado del Dashboard.
+
+### 28.2. Accesos Directos PWA ([`web/manifest.json`](file:///web/manifest.json))
+- **Shortcuts Declarados:** Agregada la clave estándar `"shortcuts"` en el manifest de la PWA:
+  - *"Dictar por Voz"* apuntando a `./?action=voice` con icono 192px.
+  - *"Ingreso Rápido"* apuntando a `./?action=nlp` con icono 192px.
+  - Permite acceso directo e instantáneo desde el menú contextual o pantalla de inicio de Android/iOS/Chrome.
+
+### 28.3. Validación y Suite de Pruebas
+- **Nueva Suite:** [`test/presentation/screens/dashboard_url_action_test.dart`](file:///test/presentation/screens/dashboard_url_action_test.dart) cubriendo casos unitarios de parsing de URLs y pruebas de widgets con apertura automática para `action=nlp` y `action=voice`.
+- **Resultados de Calidad:**
+  - **`flutter test`:** **171 de 171 tests pasando al 100% en verde** (0 fallos).
+  - **`flutter analyze`:** **0 errores y 0 advertencias**.
+
+
 
 
 

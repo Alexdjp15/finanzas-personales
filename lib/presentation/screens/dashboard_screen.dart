@@ -23,7 +23,33 @@ import 'dialogs/reminder_settings_dialog.dart';
 import 'dialogs/transfer_dialog.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({
+    super.key,
+    this.initialAction,
+  });
+
+  /// Optional initial action (e.g. 'nlp' or 'voice').
+  /// If null, it will be extracted automatically from the URL query parameters (`Uri.base`).
+  final String? initialAction;
+
+  /// Pure parser that extracts the 'action' query parameter from either:
+  /// 1. Direct query parameters: `https://.../?action=nlp`
+  /// 2. Fragment query parameters: `https://.../#/?action=voice` or `https://.../#/dashboard?action=nlp`
+  static String? parseActionFromUri(Uri uri) {
+    final directAction = uri.queryParameters['action'];
+    if (directAction != null && directAction.isNotEmpty) {
+      return directAction;
+    }
+    if (uri.hasFragment && uri.fragment.contains('?')) {
+      final queryPart = uri.fragment.split('?').last;
+      final parsed = Uri.splitQueryString(queryPart);
+      return parsed['action'];
+    }
+    return null;
+  }
+
+  /// Reads current action parameter from [Uri.base].
+  static String? getUrlAction() => parseActionFromUri(Uri.base);
 
   @override
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
@@ -32,6 +58,33 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _accountsExpanded = true;
   bool _cardsExpanded = false;
+  bool _hasHandledUrlAction = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handleUrlAction();
+    });
+  }
+
+  void _handleUrlAction() {
+    if (!mounted || _hasHandledUrlAction) return;
+    _hasHandledUrlAction = true;
+
+    final action = (widget.initialAction ?? DashboardScreen.getUrlAction())?.trim().toLowerCase();
+    if (action == 'nlp') {
+      showDialog(
+        context: context,
+        builder: (_) => const NlpEntryDialog(),
+      );
+    } else if (action == 'voice') {
+      showDialog(
+        context: context,
+        builder: (_) => const NlpEntryDialog(startListeningImmediately: true),
+      );
+    }
+  }
 
   void _showQuickActionsBottomSheet(BuildContext context) {
     final colors = AppColors.of(context);
