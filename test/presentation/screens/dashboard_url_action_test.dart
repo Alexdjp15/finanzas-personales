@@ -76,7 +76,7 @@ void main() {
 
       // NlpEntryDialog is automatically opened
       expect(find.byType(NlpEntryDialog), findsOneWidget);
-      expect(find.text('Ingreso Rápido por Frase'), findsWidgets);
+      expect(find.text('Ingreso Rápido'), findsOneWidget);
     });
 
     testWidgets('Automatically opens NlpEntryDialog with live dictation when action is "voice"', (WidgetTester tester) async {

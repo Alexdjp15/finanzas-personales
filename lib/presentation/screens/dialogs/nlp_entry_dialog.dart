@@ -461,16 +461,20 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
     final dictationState = ref.watch(voiceDictationProvider);
     final colors = AppColors.of(context);
     final mediaQuery = MediaQuery.of(context);
+    final isMobile = mediaQuery.size.width < 480;
 
     return Dialog(
+      insetPadding: isMobile
+          ? const EdgeInsets.symmetric(horizontal: 14, vertical: 20)
+          : const EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: 560,
-          maxHeight: mediaQuery.size.height * 0.85,
+          maxHeight: mediaQuery.size.height * 0.90,
         ),
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
           child: catalogAsync.when(
             loading: () => const Center(heightFactor: 3, child: CircularProgressIndicator()),
             error: (err, _) => Text('Error al cargar catálogo: $err'),
@@ -507,10 +511,10 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
                     Row(
                       children: [
                         Icon(Icons.psychology_alt_rounded, color: colors.brandAccent, size: 28),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 10),
                         const Expanded(
                           child: Text(
-                            'Ingreso Rápido por Frase (NLP)',
+                            'Ingreso Rápido',
                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -525,11 +529,12 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
                     TextField(
                       controller: _phraseController,
                       minLines: 2,
-                      maxLines: 8,
+                      maxLines: 4,
                       keyboardType: TextInputType.multiline,
                       decoration: InputDecoration(
-                        hintText: 'Ej: 50000 compra tc bancolombia | recuérdame pagar la energía los 10',
-                        labelText: 'Escribe o dicta tu transacción en lenguaje natural',
+                        hintText: 'Escribe o dicta tu movimiento...',
+                        hintMaxLines: 2,
+                        labelText: 'Escribe o dicta tu movimiento',
                         alignLabelWithHint: true,
                         prefixIcon: const Padding(
                           padding: EdgeInsets.only(top: 12.0),
@@ -936,57 +941,72 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
                         ),
                       ),
 
-                    // Kind & Amount
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 6,
-                          child: DropdownButtonFormField<String>(
-                            key: Key('dropdown_nlp_op_mode_${_isCardPayment ? "payment" : _kind.name}'),
-                            isExpanded: true,
-                            initialValue: _isCardPayment ? 'card_payment' : _kind.name,
-                            decoration: const InputDecoration(
-                              labelText: 'Operación',
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                              border: OutlineInputBorder(),
-                            ),
-                            items: const [
-                              DropdownMenuItem(value: 'expense', child: Text('Gasto / Compra', overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(value: 'income', child: Text('Ingreso', overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(value: 'card_payment', child: Text('Abonar a Tarjeta (Pagar TC)', overflow: TextOverflow.ellipsis)),
-                            ],
-                            onChanged: (v) {
-                              setState(() {
-                                if (v == 'card_payment') {
-                                  _isCardPayment = true;
-                                  _kind = TransactionKind.expense;
-                                  if (uniqueCards.isNotEmpty) {
-                                    _sourceType = SourceType.card;
-                                    _sourceId = uniqueCards.first.id;
-                                  }
-                                } else {
-                                  _isCardPayment = false;
-                                  _kind = v == 'income' ? TransactionKind.income : TransactionKind.expense;
+                    // Kind & Amount (Responsive layout: stacked vertically on mobile <440px)
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isNarrow = constraints.maxWidth < 440;
+
+                        final operationDropdown = DropdownButtonFormField<String>(
+                          key: Key('dropdown_nlp_op_mode_${_isCardPayment ? "payment" : _kind.name}'),
+                          isExpanded: true,
+                          initialValue: _isCardPayment ? 'card_payment' : _kind.name,
+                          decoration: const InputDecoration(
+                            labelText: 'Operación',
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'expense', child: Text('Gasto', overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'income', child: Text('Ingreso', overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'card_payment', child: Text('Abono a TC', overflow: TextOverflow.ellipsis)),
+                          ],
+                          onChanged: (v) {
+                            setState(() {
+                              if (v == 'card_payment') {
+                                _isCardPayment = true;
+                                _kind = TransactionKind.expense;
+                                if (uniqueCards.isNotEmpty) {
+                                  _sourceType = SourceType.card;
+                                  _sourceId = uniqueCards.first.id;
                                 }
-                              });
-                            },
+                              } else {
+                                _isCardPayment = false;
+                                _kind = v == 'income' ? TransactionKind.income : TransactionKind.expense;
+                              }
+                            });
+                          },
+                        );
+
+                        final amountField = TextField(
+                          controller: _amountController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Monto COP',
+                            prefixText: '\$ ',
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                            border: OutlineInputBorder(),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 5,
-                          child: TextField(
-                            controller: _amountController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Monto COP',
-                              prefixText: '\$ ',
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        ),
-                      ],
+                        );
+
+                        if (isNarrow) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              operationDropdown,
+                              const SizedBox(height: 12),
+                              amountField,
+                            ],
+                          );
+                        } else {
+                          return Row(
+                            children: [
+                              Expanded(flex: 6, child: operationDropdown),
+                              const SizedBox(width: 12),
+                              Expanded(flex: 5, child: amountField),
+                            ],
+                          );
+                        }
+                      },
                     ),
                     const SizedBox(height: 12),
 
@@ -998,7 +1018,7 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
                         isExpanded: true,
                         initialValue: uniqueCards.any((c) => c.id == _sourceId) ? _sourceId : null,
                         decoration: const InputDecoration(
-                          labelText: 'Tarjeta de Crédito a Abonar',
+                          labelText: 'Tarjeta a Abonar',
                           border: OutlineInputBorder(),
                         ),
                         items: uniqueCards
@@ -1024,7 +1044,7 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
                         isExpanded: true,
                         initialValue: availablePockets.any((p) => p.id == _pocketId) ? _pocketId : null,
                         decoration: const InputDecoration(
-                          labelText: 'Bolsillo de Origen (de donde sale el dinero)',
+                          labelText: 'Bolsillo de Origen',
                           border: OutlineInputBorder(),
                         ),
                         items: availablePockets
@@ -1049,7 +1069,7 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
                             ? '${_sourceType!.name}:$_sourceId'
                             : null,
                         decoration: const InputDecoration(
-                          labelText: 'Origen (Cuenta Banco o Tarjeta)',
+                          labelText: 'Cuenta o Tarjeta',
                           border: OutlineInputBorder(),
                         ),
                         items: [
@@ -1107,7 +1127,7 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
                           isExpanded: true,
                           initialValue: availablePockets.any((p) => p.id == _pocketId) ? _pocketId : null,
                           decoration: InputDecoration(
-                            labelText: 'Bolsillo de la Cuenta',
+                            labelText: 'Bolsillo',
                             border: const OutlineInputBorder(),
                             helperText: availablePockets.isEmpty
                                 ? 'Esta cuenta no tiene bolsillos registrados'

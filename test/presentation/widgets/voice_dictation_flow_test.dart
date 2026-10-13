@@ -127,8 +127,8 @@ void main() {
       // Amount field auto-completed to 35000
       expect(find.text('35000'), findsOneWidget);
 
-      // Operation kind is Gasto / Compra
-      expect(find.text('Gasto / Compra'), findsWidgets);
+      // Operation kind is Gasto
+      expect(find.text('Gasto'), findsWidgets);
 
       // Card is pre-selected and pocket is not mandatory for card charges
       expect(find.textContaining('Tarjeta'), findsWidgets);
@@ -156,8 +156,8 @@ void main() {
       // Amount field auto-completed to 150000
       expect(find.text('150000'), findsOneWidget);
 
-      // Mode is Abonar a Tarjeta
-      expect(find.text('Abonar a Tarjeta (Pagar TC)'), findsWidgets);
+      // Mode is Abono a TC
+      expect(find.text('Abono a TC'), findsWidgets);
       expect(find.textContaining('Abono / Pago de Tarjeta detectado'), findsOneWidget);
     });
 

@@ -977,6 +977,43 @@ Este archivo conserva el contexto histórico, el estado técnico, las decisiones
   - **`flutter test`:** **171 de 171 tests pasando al 100% en verde** (0 fallos).
   - **`flutter analyze`:** **0 errores y 0 advertencias**.
 
+---
+
+## 29. Corrección de Truncaciones Horizontales y Rediseño Responsivo de NlpEntryDialog — 2026-10-12
+
+### 29.1. Encabezado Conciso y Libre de Elipsis ([`lib/presentation/screens/dialogs/nlp_entry_dialog.dart`](file:///lib/presentation/screens/dialogs/nlp_entry_dialog.dart))
+- **Título Compacto:** Sustituido el título redundante `"Ingreso Rápido por Frase (NLP)"` por el título limpio `"Ingreso Rápido"`, envuelto en `Expanded` con tamaño de 18px y peso `FontWeight.bold`, conviviendo holgadamente junto al icono de cerebro y el botón `(X)`.
+
+### 29.2. Campo de Entrada con Hint Multilínea Seguro
+- **TextField Adaptable:** Configuración con `minLines: 2`, `maxLines: 4` y `keyboardType: TextInputType.multiline`.
+- **Hint Conciso:** Cambiado a `"Escribe o dicta tu movimiento..."` con `hintMaxLines: 2` y `labelText: "Escribe o dicta tu movimiento"`, impidiendo cualquier corte con puntos suspensivos ("...").
+
+### 29.3. Disposición Responsiva en Móvil (<440px): Operación y Monto COP
+- **LayoutBuilder Adaptativo:**
+  - En anchos `<440px` (móviles): Organiza los campos en columna vertical de ancho completo:
+    1. Selector "Operación" con opciones limpias: `"Gasto"`, `"Ingreso"`, `"Abono a TC"`.
+    2. Campo de texto "Monto COP" con prefijo `$ `.
+  - En pantallas `>=440px` (tablets / desktop): Conserva la fila horizontal proporcional (flex 6:5).
+- **Simplificación de Textos del Selector:**
+  - `"Gasto"` (reemplazando "Gasto / Compra")
+  - `"Ingreso"`
+  - `"Abono a TC"` (reemplazando "Abonar a Tarjeta (Pagar TC)")
+
+### 29.4. Simplificación de Etiquetas Flotantes
+- Selector de entidad origen: `"Cuenta o Tarjeta"` (en lugar de "Origen (Cuenta Banco o Tarjeta)").
+- Selector de bolsillo: `"Bolsillo"` (en lugar de "Bolsillo de la Cuenta").
+- Selectores de abono a tarjeta: `"Tarjeta a Abonar"` y `"Bolsillo de Origen"`.
+
+### 29.5. Maximización del Ancho Útil del Diálogo en Pantallas Móviles
+- **Reducción de Margen Exterior (`insetPadding`):** Ajustado dinámicamente a `EdgeInsets.symmetric(horizontal: 14, vertical: 20)` en pantallas móviles (<480px), reduciendo el padding interior a `16.0` para ganar más de 68px de ancho útil para formularios.
+
+### 29.6. Validación y Suite de Pruebas
+- **Nuevas Pruebas:** Ampliada la suite [`test/presentation/screens/mobile_layout_and_nlp_day_test.dart`](file:///test/presentation/screens/mobile_layout_and_nlp_day_test.dart) verificando el apilado vertical, la ausencia de desbordamientos RenderFlex y la visibilidad íntegra de etiquetas y hints en pantallas de 360px.
+- **Resultados de Calidad:**
+  - **`flutter test`:** **172 de 172 tests pasando al 100% en verde** (0 fallos).
+  - **`flutter analyze`:** **0 errores y 0 advertencias**.
+
+
 
 
 

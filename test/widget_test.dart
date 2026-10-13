@@ -337,8 +337,8 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Ingreso Rápido por Frase (NLP)'), findsOneWidget);
-    expect(find.text('Gasto / Compra'), findsOneWidget);
+    expect(find.text('Ingreso Rápido'), findsOneWidget);
+    expect(find.text('Gasto'), findsOneWidget);
     expect(find.text('Monto COP'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
