@@ -1047,6 +1047,54 @@ Este archivo conserva el contexto histórico, el estado técnico, las decisiones
   - **`flutter test`:** **177 de 177 tests en verde (100% de éxito)**.
   - **`flutter analyze`:** **0 advertencias / 0 errores**.
 
+---
+
+## 31. Motor Multimodal de Comprobantes Bancarios, Refinamiento de Direccionalidad y Webhook Ingest — 2026-10-13
+
+### 31.1. Refinamiento de Léxico Bancario y Direccionalidad (Ingreso vs Gasto)
+- **Backend Edge Function ([`supabase/functions/finance_ai/index.ts`](file:///supabase/functions/finance_ai/index.ts)):**
+  - Calibración estricta del System Prompt para clasificar inequívocamente transferencias entrantes como `intent_type: "income"`:
+    - Palabras clave de entrada: *"me transfirieron"*, *"te transfirieron"*, *"recibiste"*, *"te llegó"*, *"te enviaron"*, *"abono a tu cuenta"*, *"recepción de transferencia"*, *"consignación recibida"*, *"me consignaron"*, *"me pagaron"*, *"me entró"*, *"quincena"*, *"prima"*.
+    - **Regla de Oro:** *"me transfirieron 25.000 pesos a la cuenta de Bancolombia Carlos Vives"* se clasifica obligatoriamente como ingreso a la cuenta de Bancolombia, con monto 25.000 COP y descripción limpia *"Carlos Vives"*.
+    - Palabras clave de salida (*"transferiste a"*, *"enviaste a"*, *"pagaste"*, *"compraste"*, *"débito por"*, *"retiro cajero"*) clasificadas como gasto (`expense`).
+- **Parser Local Dart ([`lib/domain/services/nlp_parser.dart`](file:///lib/domain/services/nlp_parser.dart)):**
+  - Implementación de `_incomePriorityPattern` evaluado antes de las transferencias internas entre bolsillos, evitando que transferencias recibidas desde terceros sean confundidas con traspasos entre bolsillos.
+  - Métodos auxiliares `_extractCleanDescription` y `_capitalizeWords` para depurar el texto de disparadores, bancos y montos, conservando nombres de remitentes y notas con capitalización correcta.
+
+### 31.2. Motor Multimodal de Comprobantes Bancarios sin Persistencia de Imagen (`parse_receipt`)
+- **Backend Multimodal:**
+  - Acción `parse_receipt` en `finance_ai` invocando Gemini 2.0 Flash vía `inlineData` (base64 de JPEG, PNG o WebP).
+  - Reconocimiento de entidades financieras colombianas (Nequi, Bancolombia, Daviplata, Dale, Nu, Transfiya, Lulo, Davivienda) mediante colores, tipografías y logos.
+  - Discriminación de direccionalidad (egreso *"Envío exitoso"*, *"Pagaste"* vs ingreso *"Te transfirieron"*, *"Plata recibida"*).
+  - Extracción de JSON estructurado: `operation`, `amount`, `bank_name`, `recipient_or_sender`, `date`, `reference_code`, `description`.
+  - **Garantía de Privacidad y Costo Cero de Storage:** La imagen se procesa exclusivamente en memoria efímera durante la inferencia y jamás se almacena en Supabase Storage ni en disco.
+
+### 31.3. Integración en UI y Flujo de Edición Manual
+- **Asistente de Selección Cross-Platform ([`lib/presentation/utils/image_picker_helper.dart`](file:///lib/presentation/utils/image_picker_helper.dart)):**
+  - Soporte de subida nativa de archivos en Flutter Web vía HTML `FileUploadInputElement` y `FileReader` con importaciones condicionales para preservar compatibilidad con la máquina virtual de Dart en pruebas (`image_picker_stub.dart`).
+  - Detección de imágenes o datos base64 en el portapapeles con timeout de seguridad y fallback interactivo a modal de pegado directo.
+- **Diálogo NLP ([`lib/presentation/screens/dialogs/nlp_entry_dialog.dart`](file:///lib/presentation/screens/dialogs/nlp_entry_dialog.dart)):**
+  - Botón `"📷 Escanear Comprobante"` (`nlp_scan_receipt_button`).
+  - Al procesar el comprobante, **NO auto-guarda**: precarga todos los campos detectados (Operación Gasto/Ingreso, Monto COP, Cuenta o Tarjeta coincidente, Bolsillo sugerido, Descripción y nota) manteniendo total libertad de edición manual antes de confirmar.
+  - Soporta apertura automática y escaneo directo con el parámetro `initialTriggerScan: true`.
+- **Barra de Registro en Dashboard ([`lib/presentation/screens/dashboard_screen.dart`](file:///lib/presentation/screens/dashboard_screen.dart)):**
+  - Incorporado botón `"Comprobante"` (`dashboard_scan_receipt_button`) en la barra de comando superior, adaptado tanto a pantallas móviles (<620px) como de escritorio.
+  - Enrutamiento por URL: soporte para `action == 'receipt'` y `action == 'scan'`.
+
+### 31.4. Ingesta Automática por Webhook (`webhook_ingest`)
+- Acción `webhook_ingest` en la función Edge `finance_ai` preparada para consumir notificaciones en texto sin procesar provenientes de Atajos de Apple Pay, SMS bancarios de Android o integraciones de mensajería, clasificando intenciones y asociándolas al usuario sin requerir interacción manual previa.
+
+### 31.5. Validación y Suite de Pruebas
+- **Nuevas Pruebas Unitarias y de Widgets:**
+  - Pruebas en [`test/domain/nlp_parser_test.dart`](file:///test/domain/nlp_parser_test.dart) verificando la frase de Carlos Vives y variantes de recepción de transferencias en Bancolombia y Nequi.
+  - Pruebas en [`test/domain/ai_assistant_service_test.dart`](file:///test/domain/ai_assistant_service_test.dart) validando `parseReceipt` y `webhookIngest`.
+  - Pruebas en [`test/presentation/widgets/ai_dialogs_and_copilot_test.dart`](file:///test/presentation/widgets/ai_dialogs_and_copilot_test.dart) verificando renderizado del botón de escaneo y precarga íntegra sin auto-guardado.
+  - Pruebas en [`test/presentation/widgets/sofia_floating_orb_test.dart`](file:///test/presentation/widgets/sofia_floating_orb_test.dart) validando la presencia del botón de comprobante en móvil y escritorio.
+- **Resultados de Calidad:**
+  - **`flutter test`:** **181 de 181 tests pasando al 100% en verde** (0 fallos).
+  - **`flutter analyze`:** **0 errores y 0 advertencias**.
+
+
 
 
 

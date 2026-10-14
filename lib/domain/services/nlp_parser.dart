@@ -218,7 +218,11 @@ class NlpParser {
 
   static final _amountPattern = RegExp(r'(?<![\d.,])(\d{1,3}(?:[.,]\d{3})+|\d+)(?![\d])');
   static final _incomePattern = RegExp(
-    r'(?<![a-z])(ingresaron|ingreso|ingrese|recibi|recibido|me\s+pagaron|consignaron|me\s+consignaron|me\s+cayo|quincena|prima|me\s+entro|abono\s+de)(?![a-z])',
+    r'(?<![a-z])(ingresaron|ingreso|ingrese|recibi|recibido|me\s+pagaron|consignaron|me\s+consignaron|me\s+cayo|quincena|prima|me\s+entro|abono\s+de|me\s+transfirieron|te\s+transfirieron|recibiste|te\s+llego|te\s+llegó|te\s+enviaron|me\s+enviaron|abono\s+a\s+tu\s+cuenta|recepcion\s+de\s+transferencia|recepción\s+de\s+transferencia|consignacion\s+recibida|consignación\s+recibida)(?![a-z])',
+  );
+  static final _incomePriorityPattern = RegExp(
+    r'\b(?:me\s+transfirieron|te\s+transfirieron|recibiste|recibi|recibí|recibido|te\s+llego|te\s+llegó|te\s+enviaron|me\s+enviaron|abono\s+a\s+tu\s+cuenta|recepcion\s+de\s+transferencia|recepción\s+de\s+transferencia|consignacion\s+recibida|consignación\s+recibida|me\s+consignaron|consignaron|me\s+pagaron|me\s+cayo|me\s+cayó|quincena|prima|me\s+entro|me\s+entró|ingresaron|ingreso|ingrese|ingresé)\b',
+    caseSensitive: false,
   );
   static final _cardPaymentActionPattern = RegExp(
     r'(?<![a-z])(pago\s+tc|pagar\s+tc|abono\s+tc|abonar\s+tc|pago\s+tarjeta|pagar\s+tarjeta|abono\s+tarjeta|abonar\s+tarjeta|pago\s+de\s+tc|abono\s+de\s+tc|abone\s+a\s+la\s+tarjeta|le\s+meti\s+a\s+la\s+tarjeta|pague\s+la\s+tarjeta|abone\s+tc|pague\s+tc|le\s+meti\s+.*tarjeta|abone\s+.*tarjeta|pague\s+.*tarjeta)(?![a-z])',
@@ -353,8 +357,10 @@ class NlpParser {
       );
     }
 
-    // 2. Check transfer intent
-    if (_transferPattern.hasMatch(text) && (text.contains(' de ') || text.contains(' desde '))) {
+    // 2. Check transfer intent (internal pocket transfers, ignored if it is an explicit incoming transfer/income)
+    final isExplicitIncome = _incomePriorityPattern.hasMatch(text);
+
+    if (!isExplicitIncome && _transferPattern.hasMatch(text) && (text.contains(' de ') || text.contains(' desde '))) {
       final intent = _parseTransfer(text, catalog, amount);
       if (amount == null) issues.add(ParseIssue.missingAmount);
       return ParsedTransaction(
@@ -425,7 +431,7 @@ class NlpParser {
     TransactionKind kind;
     if (isCardPayment) {
       kind = TransactionKind.expense; // Pays from account, restores credit
-    } else if (_incomePattern.hasMatch(text)) {
+    } else if (isExplicitIncome || _incomePattern.hasMatch(text)) {
       kind = TransactionKind.income;
     } else {
       kind = TransactionKind.expense;
@@ -455,11 +461,15 @@ class NlpParser {
         fromPocketId: pocketId,
       );
     } else if (kind == TransactionKind.income) {
+      final cleanDesc = _extractCleanDescription(
+        input,
+        matchedAlias: accountMatch.matchedAlias ?? cardMatch.matchedAlias,
+      );
       intent = IncomeIntent(
         amount: amount,
         sourceId: sourceId,
         pocketId: pocketId,
-        description: text,
+        description: cleanDesc,
       );
     } else {
       intent = ExpenseIntent(
@@ -681,6 +691,55 @@ class NlpParser {
   static String _capitalize(String s) {
     if (s.isEmpty) return s;
     return s[0].toUpperCase() + s.substring(1);
+  }
+
+  static String _capitalizeWords(String s) {
+    if (s.isEmpty) return s;
+    return s.split(' ').map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
+  static String _extractCleanDescription(String rawInput, {String? matchedAlias}) {
+    String text = rawInput;
+
+    // 1. Remove income trigger prefix
+    text = text.replaceFirst(_incomePriorityPattern, ' ');
+
+    // 2. Remove matched bank/account and common connectors ("a la cuenta de Bancolombia", "en nequi", etc.)
+    if (matchedAlias != null && matchedAlias.trim().isNotEmpty) {
+      final bankPattern = RegExp(
+        r'\b(?:a\s+la\s+cuenta\s+de|a\s+la\s+cta\s+de|a\s+la\s+cuenta|a\s+la\s+cta|a\s+mi\s+cuenta\s+de|a\s+mi\s+cuenta|en\s+la\s+cuenta\s+de|en\s+cuenta\s+de|en\s+cuenta|a|en|para|hacia|de)\s+' +
+            RegExp.escape(matchedAlias) +
+            r'\b',
+        caseSensitive: false,
+      );
+      text = text.replaceAll(bankPattern, ' ');
+      text = text.replaceAll(RegExp('\\b${RegExp.escape(matchedAlias)}\\b', caseSensitive: false), ' ');
+    }
+
+    // Also remove generic bank connector phrases
+    text = text.replaceAll(RegExp(r'\b(?:a\s+la\s+cuenta\s+de|a\s+la\s+cta\s+de|a\s+la\s+cuenta|a\s+la\s+cta|a\s+mi\s+cuenta\s+de|a\s+mi\s+cuenta)\b', caseSensitive: false), ' ');
+
+    // 3. Remove amounts and currencies
+    text = text.replaceAll(RegExp(r'(\d+(?:[.,]\d+)?)\s*(?:palos?|millones?|millon|lucas?|barras?|k)\b', caseSensitive: false), ' ');
+    text = text.replaceAll(RegExp(r'(?<![\d.,])(\d{1,3}(?:[.,]\d{3})+|\d+)(?![\d])'), ' ');
+    text = text.replaceAll(RegExp(r'\b(?:pesos?|cop|dolares?|usd)\b', caseSensitive: false), ' ');
+    text = text.replaceAll(r'$', ' ');
+
+    // 4. Remove leading/trailing filler prepositions
+    text = text.replaceAll(RegExp(r'^\s*(?:de|por|a|para|desde)\s+', caseSensitive: false), ' ');
+    text = text.replaceAll(RegExp(r'\s+(?:de|por|a|para|desde)\s*$', caseSensitive: false), ' ');
+
+    // Clean whitespace and punctuation
+    text = text.replaceAll(RegExp(r'[^\w\s\u00C0-\u00FF]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    if (text.isEmpty) {
+      return 'Ingreso';
+    }
+
+    return _capitalizeWords(text);
   }
 
   static List<NlpTarget> _expandCardTargets(List<NlpTarget> cards) {

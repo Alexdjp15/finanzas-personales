@@ -42,7 +42,20 @@ interface AuditExpensesRequest {
   cards?: Array<{ name: string; debt: number; limit: number }>;
 }
 
-type AiRequest = ParseIntentRequest | ChatCopilotRequest | AuditExpensesRequest;
+interface ParseReceiptRequest {
+  action: "parse_receipt";
+  image_base64: string;
+  mime_type?: string;
+}
+
+interface WebhookIngestRequest {
+  action?: "webhook_ingest";
+  raw_text: string;
+  user_id?: string;
+  source?: string;
+}
+
+type AiRequest = ParseIntentRequest | ChatCopilotRequest | AuditExpensesRequest | ParseReceiptRequest | WebhookIngestRequest;
 
 async function callGemini(payload: Record<string, unknown>, apiKey: string): Promise<Record<string, unknown>> {
   const preferredModel = (Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash").trim().replace(/^models\//, "");
@@ -121,10 +134,14 @@ Tu tarea es analizar frases en lenguaje natural (escritas o dictadas por voz) y 
 Debes entender perfectamente modismos, jerga financiera colombiana y términos coloquiales:
 - "lucas" o "barras" = miles de pesos (ej: "45 barras" = 45000 COP, "50 lucas" = 50000 COP, "media luca" = 500 COP, "10 barras" = 10000 COP).
 - "palos" = millones de pesos (ej: "2 palos" = 2000000 COP).
-- "tanqueé" / "almorcé" / "compré" / "pagué" = gasto (expense).
-- "quincena", "prima", "honorarios", "me entró", "me consignaron" = ingreso (income).
+- REGLAS ESTRICTAS DE DIRECCIONALIDAD BANCARIA EN COLOMBIA (Ingreso vs Gasto):
+  * INGRESOS (intent_type: "income"):
+    Frases que denotan dinero recibido o entrante: "me transfirieron", "te transfirieron", "recibiste", "te llegó", "te enviaron", "abono a tu cuenta", "recepción de transferencia", "consignación recibida", "me consignaron", "me pagaron", "me entró", "quincena", "prima", "honorarios".
+    -> REGLA DE ORO OBLIGATORIA: Frases como "me transfirieron 25.000 pesos a la cuenta de Bancolombia Carlos Vives" DEBEN clasificarse como intent_type: "income" hacia la cuenta mencionada (Bancolombia), con amount: 25000 y description: "Carlos Vives" (el remitente/nota).
+  * GASTOS (intent_type: "expense"):
+    Frases que denotan dinero saliente o compras: "transferiste a", "enviaste a", "pagaste", "compraste", "compra por", "débito por", "retiro cajero", "tanqueé", "almorcé".
 - "pago tc", "abono a la tarjeta", "le metí a la tarjeta" = pago de tarjeta (card_payment).
-- "pasar de X a Y", "mover", "transferir" = transferencia (transfer).
+- "pasar de X a Y", "mover", "transferir de A a B" = transferencia interna (transfer).
 - "crea suscripción", "crear suscripción", "suscripción a netflix", "cobro fijo mensual", "pago mensual cada 15", "los 15", "recuérdame pagar", "recuerdame pagar", "recordar recibo", "factura del agua", "recibo del agua", "factura de la luz", "energía", "energia", "gas", "internet", "arriendo", "servicios públicos" = create_recurring.
   * Para suscripciones, cobros fijos y recordatorios de servicios públicos:
     - Regla de negocio de monto variable: Si el usuario NO menciona un valor monetario en la frase, asigna amount: 0 en el objeto recurring (y en la raíz) y clasifícalo como recordatorio recurrente de monto variable sin lanzar error.
@@ -316,6 +333,143 @@ Responde ÚNICAMENTE en JSON válido:
       return new Response(JSON.stringify({ success: true, audit: auditResult, is_ai: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (action === "parse_receipt") {
+      const { image_base64, mime_type } = body as ParseReceiptRequest;
+      if (!image_base64) {
+        return new Response(JSON.stringify({ error: "No se proporcionó 'image_base64' para analizar." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Clean prefix if data URI was provided
+      const cleanBase64 = image_base64.replace(/^data:[a-zA-Z0-9\/+-]+;base64,/, "").trim();
+      const resolvedMime = (mime_type || "image/jpeg").toLowerCase();
+
+      const systemPrompt = `Eres Sof.IA, experta en visión artificial y procesamiento forense de comprobantes bancarios en Colombia.
+Analiza la imagen adjunta correspondiente a un comprobante o captura de pantalla de transferencia bancaria (Nequi, Bancolombia, Daviplata, Dale, Nu, Transfiya, Lulo, Davivienda, etc.).
+Reglas de extracción:
+1. Detecta la entidad bancaria o billetera emisora por los colores, tipografía y logotipo (ej: Nequi = fucsia/morado, Bancolombia = franja amarilla/blanca/negra, Daviplata = rojo casita, Nu = morado).
+2. Discrimina con total exactitud la DIRECCIONALIDAD:
+   - "expense": si el comprobante indica salida de dinero ("Envío exitoso", "Transferencia exitosa", "Pagaste", "Enviaste a", "Comprobante de envío", "Débito").
+   - "income": si el comprobante indica entrada de dinero ("Te transfirieron", "Plata recibida", "Comprobante de recepción", "Te llegó plata", "Recibiste").
+3. Monto exacto (amount): número entero en COP sin puntuación ni símbolos de moneda.
+4. Remitente o destinatario (recipient_or_sender): nombre o número de teléfono/cuenta de la contraparte si es legible.
+5. Fecha (date): formato YYYY-MM-DD o texto visible.
+6. Código de referencia o comprobante (reference_code): número de referencia de la transacción.
+7. Descripción (description): resumen breve del movimiento (ej. "Envío Nequi a Juan Perez" o "Recepción de Pedro").
+8. PRIVACIDAD: La imagen solo es procesada en memoria efímera por este modelo y jamás se almacena en base de datos ni storage.
+
+Responde ÚNICAMENTE en JSON válido sin markdown ni comillas triples:
+{
+  "operation": "expense" | "income",
+  "amount": number,
+  "bank_name": string,
+  "recipient_or_sender": string | null,
+  "date": string | null,
+  "reference_code": string | null,
+  "description": string
+}`;
+
+      const geminiJson: any = await callGemini({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                inlineData: {
+                  mimeType: resolvedMime,
+                  data: cleanBase64,
+                },
+              },
+              {
+                text: "Analiza el comprobante bancario colombiano adjunto y devuelve los datos estructurados.",
+              },
+            ],
+          },
+        ],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 2048,
+          responseMimeType: "application/json",
+        },
+      }, apiKey);
+
+      const candidate = geminiJson.candidates?.[0];
+      const parts = candidate?.content?.parts ?? [];
+      const rawText = parts.map((p: any) => p.text ?? "").join("").trim() || "{}";
+      const cleanJson = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+      const receiptData = JSON.parse(cleanJson);
+
+      return new Response(JSON.stringify({ success: true, receipt: receiptData, is_ai: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "webhook_ingest" || (!action && (body as any).raw_text)) {
+      const { raw_text, user_id, source } = body as WebhookIngestRequest;
+      const textToAnalyze = (raw_text || "").trim();
+
+      if (!textToAnalyze) {
+        return new Response(JSON.stringify({ error: "Falta 'raw_text' para el webhook." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const systemPrompt = `Eres Sof.IA, el Asistente Financiero Inteligente de Colombia para Finanzas Personales.
+Tu tarea es analizar textos de notificaciones automáticas (SMS bancarios de Bancolombia, Davivienda, Nequi, Daviplata o notificaciones de Apple Pay / Google Wallet).
+Clasifica con exactitud la transacción en JSON:
+- INGRESOS (intent_type: "income"): "me transfirieron", "te transfirieron", "recibiste", "te llegó", "te enviaron", "abono a tu cuenta", "consignación recibida".
+- GASTOS (intent_type: "expense"): "compra por", "pagaste", "enviaste a", "débito por", "retiro cajero", "transferiste a".
+- Extrae: amount, source_name (banco/tarjeta), description (comercio o remitente/destinatario).
+
+Responde ÚNICAMENTE en JSON válido:
+{
+  "intent_type": "expense" | "income" | "transfer" | "card_payment",
+  "amount": number | null,
+  "source_name": string | null,
+  "source_type": "account" | "card" | null,
+  "description": string,
+  "date": string | null
+}`;
+
+      const geminiJson: any = await callGemini({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `Texto de notificación recibido: "${textToAnalyze}"` }],
+          },
+        ],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 2048,
+          responseMimeType: "application/json",
+        },
+      }, apiKey);
+
+      const candidate = geminiJson.candidates?.[0];
+      const parts = candidate?.content?.parts ?? [];
+      const rawText = parts.map((p: any) => p.text ?? "").join("").trim() || "{}";
+      const cleanJson = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+      const parsedData = JSON.parse(cleanJson);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          action: "webhook_ingest",
+          source: source || "shortcut",
+          user_id: user_id || null,
+          raw_text: textToAnalyze,
+          intent: parsedData,
+          is_ai: true,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(JSON.stringify({ error: `Acción '${action}' no reconocida.` }), {

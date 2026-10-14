@@ -54,6 +54,36 @@ void main() {
       }
     });
 
+    test('classifies Colombian incoming transfers as income and extracts clean note', () {
+      final res1 = NlpParser.parse(
+        'me transfirieron 25.000 pesos a la cuenta de Bancolombia Carlos Vives',
+        _catalog,
+      );
+      expect(res1.kind, TransactionKind.income);
+      expect(res1.amount, 25000);
+      expect(res1.sourceId, 'a-bancolombia');
+      expect(res1.intent, isA<IncomeIntent>());
+      expect((res1.intent as IncomeIntent).description, 'Carlos Vives');
+
+      final res2 = NlpParser.parse(
+        'me transfirieron 25000 a bancolombia carlos vives',
+        _catalog,
+      );
+      expect(res2.kind, TransactionKind.income);
+      expect(res2.amount, 25000);
+      expect(res2.sourceId, 'a-bancolombia');
+      expect((res2.intent as IncomeIntent).description, 'Carlos Vives');
+
+      final res3 = NlpParser.parse(
+        'te transfirieron 50 lucas a nequi Juan Pérez',
+        _catalog,
+      );
+      expect(res3.kind, TransactionKind.income);
+      expect(res3.amount, 50000);
+      expect(res3.sourceId, 'a-nequi');
+      expect((res3.intent as IncomeIntent).description, 'Juan Pérez');
+    });
+
     test('detects card payment (abono a TC) from phrases', () {
       for (final phrase in [
         'pago tc 100000 rappi',

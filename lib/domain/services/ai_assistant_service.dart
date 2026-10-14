@@ -122,6 +122,40 @@ class ExpenseAuditResult {
   final String summaryText;
 }
 
+class ParsedReceiptResult {
+  const ParsedReceiptResult({
+    required this.operation,
+    required this.amount,
+    required this.bankName,
+    this.recipientOrSender,
+    this.date,
+    this.referenceCode,
+    required this.description,
+  });
+
+  factory ParsedReceiptResult.fromJson(Map<String, dynamic> json) {
+    return ParsedReceiptResult(
+      operation: json['operation']?.toString().toLowerCase() == 'income' ? 'income' : 'expense',
+      amount: (json['amount'] as num?)?.toInt() ?? 0,
+      bankName: json['bank_name']?.toString() ?? '',
+      recipientOrSender: json['recipient_or_sender']?.toString(),
+      date: json['date']?.toString(),
+      referenceCode: json['reference_code']?.toString(),
+      description: json['description']?.toString() ?? 'Comprobante bancario',
+    );
+  }
+
+  final String operation; // 'expense' | 'income'
+  final int amount;
+  final String bankName;
+  final String? recipientOrSender;
+  final String? date;
+  final String? referenceCode;
+  final String description;
+
+  bool get isIncome => operation == 'income';
+}
+
 /// Service bridging the Flutter client with Google AI Studio (Gemini Flash)
 /// via the Supabase Edge Function `finance_ai`.
 class AiAssistantService {
@@ -378,5 +412,37 @@ class AiAssistantService {
       return ExpenseAuditResult.fromJson(data['audit'] as Map<String, dynamic>);
     }
     throw Exception(data['error'] ?? 'No se pudo completar la auditoría con IA');
+  }
+
+  /// Analyzes an image of a bank receipt or transfer slip (Nequi, Bancolombia, etc.)
+  /// without persisting the image anywhere (ephemeral in-memory processing).
+  Future<ParsedReceiptResult> parseReceipt({
+    required String imageBase64,
+    String mimeType = 'image/jpeg',
+  }) async {
+    final data = await _invoke('parse_receipt', {
+      'image_base64': imageBase64,
+      'mime_type': mimeType,
+    });
+
+    if (data['success'] == true && data['receipt'] != null) {
+      return ParsedReceiptResult.fromJson(data['receipt'] as Map<String, dynamic>);
+    }
+    throw Exception(data['error'] ?? 'No se pudo procesar el comprobante bancario');
+  }
+
+  /// Ingests automated raw text from Apple Pay Shortcuts, Android SMS or Push webhooks.
+  Future<Map<String, dynamic>> webhookIngest({
+    required String rawText,
+    String? userId,
+    String? source,
+  }) async {
+    final payload = <String, dynamic>{
+      'raw_text': rawText,
+    };
+    if (userId != null) payload['user_id'] = userId;
+    if (source != null) payload['source'] = source;
+
+    return await _invoke('webhook_ingest', payload);
   }
 }

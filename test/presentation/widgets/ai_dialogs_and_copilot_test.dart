@@ -9,6 +9,7 @@ import 'package:finanzas_personales/presentation/providers/finance_state_provide
 import 'package:finanzas_personales/presentation/screens/dialogs/ai_copilot_dialog.dart';
 import 'package:finanzas_personales/presentation/screens/dialogs/expense_audit_dialog.dart';
 import 'package:finanzas_personales/presentation/screens/dialogs/nlp_entry_dialog.dart';
+import 'package:finanzas_personales/presentation/utils/image_picker_helper.dart';
 
 void main() {
   const mockAccounts = [
@@ -223,13 +224,86 @@ void main() {
 
       final inputFinder = find.byType(TextField).first;
       await tester.enterText(inputFinder, 'crear suscripcion spotify 38000 los 10 con tarjeta');
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.pumpAndSettle();
 
       expect(find.text('✨ Analizado con IA'), findsOneWidget);
       expect(find.textContaining('Suscripción Detectada'), findsOneWidget);
       expect(find.textContaining('Spotify Premium'), findsOneWidget);
       expect(find.textContaining('Cobro mensual: Día 10'), findsOneWidget);
+    });
+
+    testWidgets('renders scan receipt button and preloads receipt data without auto-saving', (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      ImagePickerHelper.customClipboardReader = () async => null;
+      addTearDown(() {
+        ImagePickerHelper.customClipboardReader = null;
+        ImagePickerHelper.customPicker = null;
+      });
+
+      final mockAiService = AiAssistantService(
+        functionInvoker: (action, payload) async {
+          if (action == 'parse_receipt') {
+            return {
+              'success': true,
+              'receipt': {
+                'operation': 'income',
+                'amount': 25000,
+                'bank_name': 'Bancolombia',
+                'recipient_or_sender': 'Carlos Vives',
+                'description': 'Transferencia recibida de Carlos Vives',
+              },
+            };
+          }
+          return {'success': false};
+        },
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            aiAssistantServiceProvider.overrideWithValue(mockAiService),
+            nlpCatalogProvider.overrideWith((ref) => Future.value(mockCatalog)),
+            accountsProvider.overrideWith((ref) => Future.value(mockAccounts)),
+            pocketsProvider.overrideWith((ref) => Future.value(mockPockets)),
+            creditCardsProvider.overrideWith((ref) => Future.value(mockCards)),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: NlpEntryDialog(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 1. Check scan receipt button is rendered
+      final scanBtn = find.byKey(const Key('nlp_scan_receipt_button'));
+      expect(scanBtn, findsOneWidget);
+
+      // 2. Tap scan button -> Opens paste dialog in test environment
+      await tester.tap(scanBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pegar Comprobante / Base64'), findsOneWidget);
+
+      // 3. Enter fake base64 data and tap Analizar
+      final pasteInput = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(pasteInput, 'data:image/jpeg;base64,fakeData');
+      await tester.tap(find.text('Analizar'));
+      await tester.pumpAndSettle();
+
+      // 4. Verify fields preloaded: amount 25000, description, and NOT auto-saved (action button is Confirmar Ingreso)
+      expect(find.text('25000'), findsOneWidget);
+      expect(find.text('Transferencia recibida de Carlos Vives'), findsOneWidget);
+      expect(find.text('Confirmar Ingreso'), findsOneWidget);
     });
   });
 }

@@ -306,5 +306,71 @@ void main() {
       expect(result.sourceId, 'acc-1');
       expect(result.pocketId, 'p-1');
     });
+
+    test('parseReceipt invokes Edge function with image_base64 and returns ParsedReceiptResult', () async {
+      final mockService = AiAssistantService(
+        functionInvoker: (action, payload) async {
+          expect(action, 'parse_receipt');
+          expect(payload['image_base64'], 'fake_base64_data');
+          expect(payload['mime_type'], 'image/png');
+          return {
+            'success': true,
+            'receipt': {
+              'operation': 'income',
+              'amount': 45000,
+              'bank_name': 'Nequi',
+              'recipient_or_sender': 'Carlos Vives',
+              'date': '2026-10-14',
+              'reference_code': 'M12345678',
+              'description': 'Plata recibida de Carlos Vives',
+            },
+          };
+        },
+      );
+
+      final result = await mockService.parseReceipt(
+        imageBase64: 'fake_base64_data',
+        mimeType: 'image/png',
+      );
+
+      expect(result.operation, 'income');
+      expect(result.isIncome, isTrue);
+      expect(result.amount, 45000);
+      expect(result.bankName, 'Nequi');
+      expect(result.recipientOrSender, 'Carlos Vives');
+      expect(result.date, '2026-10-14');
+      expect(result.referenceCode, 'M12345678');
+      expect(result.description, 'Plata recibida de Carlos Vives');
+    });
+
+    test('webhookIngest invokes Edge function with rawText, userId, and source', () async {
+      final mockService = AiAssistantService(
+        functionInvoker: (action, payload) async {
+          expect(action, 'webhook_ingest');
+          expect(payload['raw_text'], 'Compra por \$25.000 en Éxito');
+          expect(payload['user_id'], 'usr-123');
+          expect(payload['source'], 'apple_pay');
+          return {
+            'success': true,
+            'status': 'ingested',
+            'parsed_intent': {
+              'intent_type': 'expense',
+              'amount': 25000,
+              'description': 'Éxito',
+            },
+          };
+        },
+      );
+
+      final result = await mockService.webhookIngest(
+        rawText: 'Compra por \$25.000 en Éxito',
+        userId: 'usr-123',
+        source: 'apple_pay',
+      );
+
+      expect(result['success'], isTrue);
+      expect(result['status'], 'ingested');
+      expect(result['parsed_intent']['amount'], 25000);
+    });
   });
 }

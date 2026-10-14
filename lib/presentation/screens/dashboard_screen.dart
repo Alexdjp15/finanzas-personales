@@ -83,6 +83,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         context: context,
         builder: (_) => const NlpEntryDialog(startListeningImmediately: true),
       );
+    } else if (action == 'receipt' || action == 'scan') {
+      showDialog(
+        context: context,
+        builder: (_) => const NlpEntryDialog(initialTriggerScan: true),
+      );
     }
   }
 
@@ -497,6 +502,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ),
                         );
 
+                        final scanReceiptButton = OutlinedButton.icon(
+                          key: const Key('dashboard_scan_receipt_button'),
+                          onPressed: () => showDialog(
+                            context: context,
+                            builder: (_) => const NlpEntryDialog(initialTriggerScan: true),
+                          ),
+                          icon: const Icon(Icons.document_scanner_outlined, size: 18),
+                          label: const Text(
+                            'Comprobante',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: colors.brandAccent,
+                            side: BorderSide(
+                              color: colors.brandAccent.withValues(alpha: 0.7),
+                              width: 1.4,
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+
                         if (isCompact) {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -527,7 +555,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                           ),
                                         ),
                                         Text(
-                                          'Escribe o dicta tu movimiento',
+                                          'Escribe, dicta o escanea comprobante',
                                           style: TextStyle(
                                             color: colors.textSecondary,
                                             fontSize: 12,
@@ -547,6 +575,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   const SizedBox(width: 8),
                                   Expanded(child: voiceButton),
                                 ],
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: scanReceiptButton,
                               ),
                             ],
                           );
@@ -591,12 +624,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               ),
                             ),
                             const SizedBox(width: 16),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 phraseButton,
-                                const SizedBox(width: 10),
                                 voiceButton,
+                                scanReceiptButton,
                               ],
                             ),
                           ],

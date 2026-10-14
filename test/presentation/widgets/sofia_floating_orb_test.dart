@@ -98,6 +98,7 @@ void main() {
       expect(find.text('Dictar por Voz'), findsOneWidget);
       expect(find.byKey(const Key('dashboard_phrase_entry_button')), findsOneWidget);
       expect(find.byKey(const Key('dashboard_voice_dictation_button')), findsOneWidget);
+      expect(find.byKey(const Key('dashboard_scan_receipt_button')), findsOneWidget);
 
       // Verify "Copiloto IA" button is completely removed from command bar
       expect(find.byKey(const Key('dashboard_ai_copilot_button')), findsNothing);
@@ -131,6 +132,7 @@ void main() {
       expect(find.text('Registro Inteligente'), findsOneWidget);
       expect(find.text('Ingreso por Frase'), findsOneWidget);
       expect(find.text('Dictar por Voz'), findsOneWidget);
+      expect(find.byKey(const Key('dashboard_scan_receipt_button')), findsOneWidget);
       expect(find.byType(SofiaFloatingOrb), findsOneWidget);
       expect(tester.takeException(), isNull);
     });

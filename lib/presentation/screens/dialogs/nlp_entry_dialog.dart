@@ -10,15 +10,18 @@ import '../../providers/supabase_providers.dart';
 import '../../providers/voice_dictation_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/formatters.dart';
+import '../../utils/image_picker_helper.dart';
 import '../../widgets/voice_dictation_widgets.dart';
 
 class NlpEntryDialog extends ConsumerStatefulWidget {
   const NlpEntryDialog({
     super.key,
     this.startListeningImmediately = false,
+    this.initialTriggerScan = false,
   });
 
   final bool startListeningImmediately;
+  final bool initialTriggerScan;
 
   @override
   ConsumerState<NlpEntryDialog> createState() => _NlpEntryDialogState();
@@ -53,7 +56,187 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
         final catalog = ref.read(nlpCatalogProvider).value ?? NlpCatalog.empty;
         _toggleVoiceDictation(catalog);
       });
+    } else if (widget.initialTriggerScan) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final catalog = ref.read(nlpCatalogProvider).value ?? NlpCatalog.empty;
+        _handleScanReceipt(catalog);
+      });
     }
+  }
+
+  Future<void> _handleScanReceipt(NlpCatalog catalog) async {
+    try {
+      // 1. Try native file picker (web file input)
+      String? base64Image = await ImagePickerHelper.pickImage();
+
+      // 2. If null (unsupported, user canceled or on desktop/test), check clipboard or prompt
+      if (base64Image == null && mounted) {
+        final clipboardData = await ImagePickerHelper.readFromClipboard();
+        if (clipboardData != null) {
+          base64Image = clipboardData;
+        } else {
+          base64Image = await _showPasteImageDialog();
+        }
+      }
+
+      if (base64Image == null || !mounted) {
+        return;
+      }
+
+      setState(() => _isAiLoading = true);
+
+      String mime = 'image/jpeg';
+      if (base64Image.startsWith('data:image/png')) {
+        mime = 'image/png';
+      } else if (base64Image.startsWith('data:image/webp')) {
+        mime = 'image/webp';
+      }
+
+      final aiService = ref.read(aiAssistantServiceProvider);
+      final receipt = await aiService.parseReceipt(
+        imageBase64: base64Image,
+        mimeType: mime,
+      );
+
+      if (!mounted) return;
+
+      final accounts = ref.read(accountsProvider).value ?? [];
+      final cards = ref.read(creditCardsProvider).value ?? [];
+      final pockets = ref.read(pocketsProvider).value ?? [];
+
+      final normBank = receipt.bankName.toLowerCase().trim();
+      Account? matchedAccount;
+      CreditCard? matchedCard;
+
+      for (final acc in accounts) {
+        final accNorm = acc.name.toLowerCase();
+        if (accNorm.contains(normBank) || normBank.contains(accNorm)) {
+          matchedAccount = acc;
+          break;
+        }
+      }
+
+      if (matchedAccount == null) {
+        for (final c in cards) {
+          final cNorm = c.name.toLowerCase();
+          final entNorm = c.entity.toLowerCase();
+          if (cNorm.contains(normBank) || entNorm.contains(normBank) || normBank.contains(cNorm)) {
+            matchedCard = c;
+            break;
+          }
+        }
+      }
+
+      // Default to first account if none matched
+      matchedAccount ??= (matchedCard == null && accounts.isNotEmpty) ? accounts.first : null;
+
+      String? matchedPocketId;
+      if (matchedAccount != null) {
+        final accPockets = pockets.where((p) => p.accountId == matchedAccount!.id).toList();
+        matchedPocketId = accPockets.isNotEmpty ? accPockets.first.id : null;
+      } else if (pockets.isNotEmpty) {
+        matchedPocketId = pockets.first.id;
+      }
+
+      final opKind = receipt.isIncome ? TransactionKind.income : TransactionKind.expense;
+
+      setState(() {
+        _kind = opKind;
+        _amountController.text = receipt.amount > 0 ? receipt.amount.toString() : '';
+        if (matchedCard != null) {
+          _sourceType = SourceType.card;
+          _sourceId = matchedCard.id;
+          _pocketId = pockets.isNotEmpty ? pockets.first.id : null;
+          _isCardPayment = false;
+        } else if (matchedAccount != null) {
+          _sourceType = SourceType.account;
+          _sourceId = matchedAccount.id;
+          _pocketId = matchedPocketId;
+          _isCardPayment = false;
+        }
+        _descController.text = receipt.description;
+        _phraseController.text =
+            '${receipt.isIncome ? "Ingreso" : "Gasto"} ${receipt.bankName} \$${receipt.amount} ${receipt.recipientOrSender ?? ""}';
+        _isAiAnalyzed = true;
+
+        if (receipt.isIncome) {
+          _intent = IncomeIntent(
+            amount: receipt.amount,
+            sourceId: _sourceId,
+            pocketId: _pocketId,
+            description: receipt.description,
+          );
+        } else {
+          _intent = ExpenseIntent(
+            amount: receipt.amount,
+            sourceType: _sourceType,
+            sourceId: _sourceId,
+            pocketId: _pocketId,
+            description: receipt.description,
+          );
+        }
+        _issues = [];
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '✨ Comprobante de ${receipt.bankName} analizado con Sof.IA. Revisa y confirma antes de guardar.',
+          ),
+          backgroundColor: AppColors.of(context).brandAccent,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al procesar el comprobante: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isAiLoading = false);
+      }
+    }
+  }
+
+  Future<String?> _showPasteImageDialog() async {
+    final pasteCtrl = TextEditingController();
+    return showDialog<String?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Pegar Comprobante / Base64'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Pega la imagen en Base64 o data URI (data:image/...) del comprobante bancario para que Sof.IA lo analice:',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: pasteCtrl,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: 'data:image/jpeg;base64,...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(pasteCtrl.text.trim()),
+            child: const Text('Analizar'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _toggleVoiceDictation(NlpCatalog catalog) async {
@@ -568,6 +751,35 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       onChanged: (val) => _onPhraseChanged(val, catalog),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            key: const Key('nlp_scan_receipt_button'),
+                            onPressed: _isAiLoading ? null : () => _handleScanReceipt(catalog),
+                            icon: _isAiLoading
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.document_scanner_outlined, size: 18),
+                            label: Text(
+                              _isAiLoading ? 'Sof.IA analizando comprobante...' : '📷 Escanear Comprobante',
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: colors.brandAccent,
+                              side: BorderSide(color: colors.brandAccent.withValues(alpha: 0.6)),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     if (dictationState.isListening) ...[
                       const SizedBox(height: 8),
