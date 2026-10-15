@@ -1134,3 +1134,54 @@ Este archivo conserva el contexto histórico, el estado técnico, las decisiones
   - Test unitario validando *"me gasté 15 mil en almuerzo desde nequi bolsillo personal"* -> amount: 15.000, cuenta: Nequi, bolsillo: Personal, nota: Almuerzo.
   - Test unitario validando inyección dinámica de cuentas y bolsillos en `NlpParser.parse`.
   - Test unitario verificando la transmisión de `available_accounts` y `available_pockets` con `image/jpeg` en `parseReceipt` y `parseIntentWithAi`.
+
+---
+
+## 33. Creación de Usuario de Pruebas y Datos Semilla Aislados (2026-10-15)
+
+### 33.1. Contexto y Objetivos
+- **Protección de Cuenta Principal:** Salvaguardar los datos reales de `alexdjp15@gmail.com` permitiendo pruebas exhaustivas (NLP, comprobantes, edición de entidades, recordatorios, transferencias) en un entorno realista y aislado.
+- **Aislamiento por RLS:** Todas las tablas de la base de datos (`accounts`, `pockets`, `credit_cards`, `transactions`, `recurring_payments`, `aliases`) están protegidas por Row-Level Security (`auth.uid() = user_id`).
+
+### 33.2. Credenciales del Usuario de Pruebas
+- **Nombre de Usuario (`username`):** `demo_tester`
+- **Correo Electrónico (`email`):** `demo_tester@finanzas.app`
+- **Contraseña (`password`):** `Password123!`
+- **Estado de Confirmación:** Correo confirmado (`email_confirmed_at` verificado en Supabase Auth).
+- **Compatibilidad de Login:** Puede iniciar sesión ingresando el username `demo_tester` o el email `demo_tester@finanzas.app`.
+
+### 33.3. Datos Semilla Poblados en Supabase
+1. **Cuentas Bancarias y Bolsillos (7 bolsillos con saldos en COP):**
+   - **Bancolombia** (`1089-234567`):
+     - *Disponible en Cuenta*: $450.000 COP
+     - *Personal*: $380.000 COP
+     - *Arriendo*: $1.200.000 COP
+     - *Ahorro Vacaciones*: $850.000 COP
+   - **Nequi** (`300 123 4567`):
+     - *Disponible Nequi*: $135.000 COP
+     - *Comidas Fuera*: $90.000 COP
+   - **Daviplata** (`310 987 6543`):
+     - *Servicios Públicos*: $160.000 COP
+2. **Tarjetas de Crédito:**
+   - **RappiCard:** Cupo $3.000.000 COP (Corte: día 18, Pago: día 5)
+   - **Tarjeta Nu:** Cupo $5.000.000 COP (Corte: día 12, Pago: día 2)
+3. **Alias NLP:** Bancolombia, Nequi, Daviplata, Rappi, RappiCard, Nu, Tarjeta Nu, Personal, Arriendo, Vacaciones, Comidas, Servicios.
+4. **Historial de Transacciones (7 movimientos reales):**
+   - Ingreso nómina quincena ($2.500.000 COP a Disponible Bancolombia).
+   - Gasto Mercado Éxito ($185.000 COP desde Personal).
+   - Gasto Almuerzo Restaurante ($28.000 COP desde Comidas Fuera Nequi).
+   - Cargo TC RappiCard ($50.000 COP Gasolina Terpel).
+   - Cargo TC Nu ($35.000 COP Farmacia La Rebaja).
+   - Abono a TC Nu ($400.000 COP pagado desde Disponible Bancolombia).
+   - Transferencia entre bolsillos ($150.000 COP de Personal a Ahorro Vacaciones).
+5. **Suscripciones y Recordatorios Recurrentes (5 registros):**
+   - Netflix 4K ($45.000 COP, día 15, auto-deduct, TC RappiCard).
+   - Spotify Familiar ($26.900 COP, día 5, auto-deduct, TC Nu).
+   - Factura Internet Claro ($95.000 COP, día 10, manual, Bancolombia).
+   - Recibo del Agua ($0 COP - Monto Variable, día 18, manual, Daviplata).
+   - Gimnasio SmartFit ($89.000 COP, día 1, auto-deduct, Nequi).
+
+### 33.4. Actualizaciones de Esquema y Migraciones
+- Migración [`supabase/migrations/20261015160000_recurring_payments_allow_zero_amount.sql`](file:///supabase/migrations/20261015160000_recurring_payments_allow_zero_amount.sql): actualizó el constraint `recurring_payments_amount_check` de `amount > 0` a `amount >= 0`, permitiendo persistir recordatorios de servicios públicos y facturas variables con valor $0 COP sin error de base de datos.
+- Utilidad repetible de siembra: [`tool/seed_test_user.dart`](file:///tool/seed_test_user.dart), ejecutable en cualquier momento con `dart run tool/seed_test_user.dart` para restablecer el entorno de prueba con datos frescos sin tocar ninguna otra cuenta.
+
