@@ -86,24 +86,23 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
 
       setState(() => _isAiLoading = true);
 
-      String mime = 'image/jpeg';
-      if (base64Image.startsWith('data:image/png')) {
-        mime = 'image/png';
-      } else if (base64Image.startsWith('data:image/webp')) {
-        mime = 'image/webp';
-      }
+      // Client-side compression & conversion: resize to max 1280px width, convert to JPEG 80-85% quality
+      base64Image = await ImagePickerHelper.compressImage(base64Image);
+      const mime = 'image/jpeg';
+
+      final accounts = ref.read(accountsProvider).value ?? [];
+      final cards = ref.read(creditCardsProvider).value ?? [];
+      final pockets = ref.read(pocketsProvider).value ?? [];
 
       final aiService = ref.read(aiAssistantServiceProvider);
       final receipt = await aiService.parseReceipt(
         imageBase64: base64Image,
         mimeType: mime,
+        availableAccounts: accounts,
+        availablePockets: pockets,
       );
 
       if (!mounted) return;
-
-      final accounts = ref.read(accountsProvider).value ?? [];
-      final cards = ref.read(creditCardsProvider).value ?? [];
-      final pockets = ref.read(pocketsProvider).value ?? [];
 
       final normBank = receipt.bankName.toLowerCase().trim();
       Account? matchedAccount;
@@ -289,7 +288,16 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
       return;
     }
 
-    final parsed = NlpParser.parse(text, catalog);
+    final accounts = ref.read(accountsProvider).value ?? [];
+    final cards = ref.read(creditCardsProvider).value ?? [];
+    final pockets = ref.read(pocketsProvider).value ?? [];
+
+    final parsed = NlpParser.parse(
+      text,
+      catalog,
+      availableAccounts: accounts,
+      availablePockets: pockets,
+    );
     setState(() {
       _intent = parsed.intent;
       _issues = parsed.issues;
@@ -308,7 +316,15 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
         _recurringDayController.text =
             (parsed.intent as CreateRecurringIntent).dayOfMonth?.toString() ?? '1';
       }
-      _descController.text = text.trim();
+      if (parsed.intent is ExpenseIntent &&
+          (parsed.intent as ExpenseIntent).description.isNotEmpty) {
+        _descController.text = (parsed.intent as ExpenseIntent).description;
+      } else if (parsed.intent is IncomeIntent &&
+          (parsed.intent as IncomeIntent).description.isNotEmpty) {
+        _descController.text = (parsed.intent as IncomeIntent).description;
+      } else {
+        _descController.text = text.trim();
+      }
     });
 
     // If phrase involves creation intents, Colombian slang, or local parser has issues,
@@ -317,9 +333,6 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
       setState(() => _isAiLoading = true);
       _debounceTimer = Timer(const Duration(milliseconds: 350), () async {
         final aiService = ref.read(aiAssistantServiceProvider);
-        final accounts = ref.read(accountsProvider).value ?? [];
-        final cards = ref.read(creditCardsProvider).value ?? [];
-        final pockets = ref.read(pocketsProvider).value ?? [];
 
         try {
           final aiResult = await aiService.parseIntentWithAi(
@@ -350,6 +363,13 @@ class _NlpEntryDialogState extends ConsumerState<NlpEntryDialog> {
               if (aiResult.intent is CreateRecurringIntent) {
                 _recurringDayController.text =
                     (aiResult.intent as CreateRecurringIntent).dayOfMonth?.toString() ?? '1';
+              }
+              if (aiResult.intent is ExpenseIntent &&
+                  (aiResult.intent as ExpenseIntent).description.isNotEmpty) {
+                _descController.text = (aiResult.intent as ExpenseIntent).description;
+              } else if (aiResult.intent is IncomeIntent &&
+                  (aiResult.intent as IncomeIntent).description.isNotEmpty) {
+                _descController.text = (aiResult.intent as IncomeIntent).description;
               }
             });
           }

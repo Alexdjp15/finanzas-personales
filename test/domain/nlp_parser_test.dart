@@ -1,3 +1,4 @@
+import 'package:finanzas_personales/domain/models/models.dart';
 import 'package:finanzas_personales/domain/services/nlp_parser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -202,6 +203,64 @@ void main() {
       expect(result.issues, contains(ParseIssue.missingAmount));
       expect(result.sourceType, SourceType.account);
       expect(result.sourceId, _catalog.accounts.first.id);
+    });
+
+    test('extracts exact account, pocket, amount and clean description for "me gasté 15 mil en almuerzo desde nequi bolsillo personal"', () {
+      const catalogWithNequiPersonal = NlpCatalog(
+        accounts: [
+          NlpTarget(id: 'a-nequi', aliases: ['nequi']),
+          NlpTarget(id: 'a-bancolombia', aliases: ['bancolombia']),
+        ],
+        cards: [],
+        pockets: [
+          NlpPocketTarget(id: 'p-personal-nequi', accountId: 'a-nequi', aliases: ['personal']),
+        ],
+      );
+
+      final result = NlpParser.parse(
+        'me gasté 15 mil en almuerzo desde nequi bolsillo personal',
+        catalogWithNequiPersonal,
+      );
+
+      expect(result.kind, TransactionKind.expense);
+      expect(result.amount, 15000);
+      expect(result.sourceType, SourceType.account);
+      expect(result.sourceId, 'a-nequi');
+      expect(result.pocketId, 'p-personal-nequi');
+      expect(result.issues, isEmpty);
+      expect(result.intent, isA<ExpenseIntent>());
+      final expense = result.intent as ExpenseIntent;
+      expect(expense.description, 'Almuerzo');
+      expect(expense.amount, 15000);
+      expect(expense.sourceId, 'a-nequi');
+      expect(expense.pocketId, 'p-personal-nequi');
+    });
+
+    test('supports dynamic availableAccounts and availablePockets parameters in parse', () {
+      final dynamicResult = NlpParser.parse(
+        'me gasté 15 mil en almuerzo desde nequi bolsillo personal',
+        NlpCatalog.empty,
+        availableAccounts: const [Account(id: 'dyn-nequi', name: 'Nequi')],
+        availablePockets: const [Pocket(id: 'dyn-pck', accountId: 'dyn-nequi', name: 'Personal', balance: 0)],
+      );
+
+      expect(dynamicResult.amount, 15000);
+      expect(dynamicResult.sourceId, 'dyn-nequi');
+      expect(dynamicResult.pocketId, 'dyn-pck');
+      expect(dynamicResult.intent, isA<ExpenseIntent>());
+      expect((dynamicResult.intent as ExpenseIntent).description, 'Almuerzo');
+    });
+
+    test('cleans expense notes properly for various colloquial expressions', () {
+      final res1 = NlpParser.parse('15000 gasolina', _catalog);
+      expect(res1.intent, isA<ExpenseIntent>());
+      expect((res1.intent as ExpenseIntent).description, 'Gasolina');
+
+      final res2 = NlpParser.parse('gasté 50 lucas en mercado nequi', _catalog);
+      expect(res2.intent, isA<ExpenseIntent>());
+      expect((res2.intent as ExpenseIntent).description, 'Mercado');
+      expect(res2.amount, 50000);
+      expect(res2.sourceId, 'a-nequi');
     });
   });
 }

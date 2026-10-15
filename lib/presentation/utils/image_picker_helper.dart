@@ -39,4 +39,18 @@ class ImagePickerHelper {
     }
     return null;
   }
+
+  /// Compresses an image (data URL or base64) to JPEG with max 1280px width and quality 0.82.
+  static Future<String> compressImage(
+    String dataUrl, {
+    int maxWidth = 1280,
+    double quality = 0.82,
+  }) async {
+    return await platform_picker.compressAndConvertToJpeg(
+      dataUrl,
+      maxWidth: maxWidth,
+      quality: quality,
+    );
+  }
 }
+

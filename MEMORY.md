@@ -1094,16 +1094,43 @@ Este archivo conserva el contexto histórico, el estado técnico, las decisiones
   - **`flutter test`:** **181 de 181 tests pasando al 100% en verde** (0 fallos).
   - **`flutter analyze`:** **0 errores y 0 advertencias**.
 
+---
 
+## 32. Compresión de Comprobantes en el Cliente e Inyección Contextual de Cuentas y Bolsillos en NLP — 2026-10-15
 
+### 32.1. Compresión y Conversión de Comprobantes en el Cliente
+- **Selector Web Multiformato ([`lib/presentation/utils/image_picker_web.dart`](file:///lib/presentation/utils/image_picker_web.dart)):**
+  - Parámetro `accept` configurado con formatos estándar y formatos móviles de iOS: `'image/*,.heic,.heif,.png,.jpg,.jpeg,.webp'`.
+  - Implementación de compresión del lado del cliente utilizando HTML5 Canvas con fondo opaco y reescalado proporcional a un ancho máximo de 1280px.
+  - Conversión de cualquier imagen seleccionada, copiada del portapapeles o pegada a formato `image/jpeg` con compresión de calidad 82% (`0.82`), reduciendo drásticamente el peso del Base64 antes de transmitirlo por la red.
+  - Método utilitario `compressImage` expuesto en [`lib/presentation/utils/image_picker_helper.dart`](file:///lib/presentation/utils/image_picker_helper.dart) con stubs limpios para Dart VM/tests ([`lib/presentation/utils/image_picker_stub.dart`](file:///lib/presentation/utils/image_picker_stub.dart)).
+- **Manejo en la Interfaz ([`lib/presentation/screens/dialogs/nlp_entry_dialog.dart`](file:///lib/presentation/screens/dialogs/nlp_entry_dialog.dart)):**
+  - Envío explícito de `mimeType: 'image/jpeg'` en la llamada a `parseReceipt`.
+  - Captura robusta de errores con `SnackBar` descriptivo en color de alerta en caso de fallos de red o de la Edge Function.
 
+### 32.2. Inyección Dinámica de Cuentas y Bolsillos en NLP
+- **Backend Edge Function ([`supabase/functions/finance_ai/index.ts`](file:///supabase/functions/finance_ai/index.ts)):**
+  - Extensión de interfaces `ParseIntentRequest` y `ParseReceiptRequest` para admitir `available_accounts` (`[{ id, name }]`) y `available_pockets` (`[{ id, name, bank_account_id }]`).
+  - Inyección dinámica de las cuentas y bolsillos existentes del usuario directamente dentro del System Prompt de Gemini 2.0 Flash.
+  - Instrucciones estrictas de coincidencia de nombres ignorando mayúsculas, minúsculas, tildes y preposiciones o conectores coloquiales (*"en el bolsillo"*, *"desde el bolsillo"*, *"del bolsillo"*, *"de bolsillo"*, *"desde la cuenta"*, *"en la cuenta"*, *"por"*, *"en"*, *"desde"*).
+  - Regla de Oro: Frases como *"me gasté 15 mil en almuerzo desde nequi bolsillo personal"* son mapeadas con exactitud a:
+    - `operation` / `intent_type`: `"expense"`
+    - `amount`: `15000` (resolución de *"mil"* como 1000 COP)
+    - `bank_account` / `source_name`: `"Nequi"` con su respectivo `source_id`
+    - `pocket` / `pocket_name`: `"Personal"` con su respectivo `pocket_id`
+    - `note` / `description`: `"Almuerzo"`
+- **Frontend y Parser Local ([`lib/domain/services/nlp_parser.dart`](file:///lib/domain/services/nlp_parser.dart) y [`lib/domain/services/ai_assistant_service.dart`](file:///lib/domain/services/ai_assistant_service.dart)):**
+  - Inclusión del multiplicador `"mil"` en `_extractAmount` (`15 mil` -> 15.000 COP).
+  - Método `_expandPocketTargets` que genera alias expandidos con combinaciones preposicionales (*"bolsillo $alias"*, *"del bolsillo $alias"*, *"desde el bolsillo $alias"*, *"en el bolsillo $alias"*).
+  - Método `_extractCleanExpenseDescription` con límites Unicode seguros (`(?<![a-záéíóúüñ])`) que elimina disparadores (*"me gasté"*, *"gasté"*, *"pagué"*, etc.), cuentas (*"desde nequi"*), bolsillos (*"bolsillo personal"*), montos (*"15 mil"*) y preposiciones iniciales (*"en "*), aislando la nota limpia (*"Almuerzo"*).
+  - Soporte de `availableAccounts` y `availablePockets` opcionales en `NlpParser.parse` para enriquecimiento dinámico en caliente del catálogo.
+  - `AiAssistantService.parseIntentWithAi` y `parseReceipt` envían `available_accounts` y `available_pockets` al backend y mapean de forma bidireccional `bank_account`, `pocket` y `note`.
+  - `NlpEntryDialog` actualiza el campo de nota (`_descController.text`) con la descripción limpia extraída tanto en modo local como tras la refinación por IA.
 
-
-
-
-
-
-
-
-
-
+### 32.3. Estado de Calidad y Verificación
+- **Pruebas Automatizadas:** **186 de 186 tests pasando al 100% en verde** (0 fallos).
+- **Análisis Estático:** `flutter analyze` reporta **0 errores y 0 advertencias**.
+- **Cobertura de Casos Clave:**
+  - Test unitario validando *"me gasté 15 mil en almuerzo desde nequi bolsillo personal"* -> amount: 15.000, cuenta: Nequi, bolsillo: Personal, nota: Almuerzo.
+  - Test unitario validando inyección dinámica de cuentas y bolsillos en `NlpParser.parse`.
+  - Test unitario verificando la transmisión de `available_accounts` y `available_pockets` con `image/jpeg` en `parseReceipt` y `parseIntentWithAi`.

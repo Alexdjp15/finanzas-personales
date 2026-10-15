@@ -208,19 +208,31 @@ class AiAssistantService {
     List<Pocket>? pockets,
   }) async {
     try {
+      final accountsPayload = (accounts ?? []).map((a) => {'id': a.id, 'name': a.name}).toList();
+      final pocketsPayload = (pockets ?? [])
+          .map((p) => {
+                'id': p.id,
+                'name': p.name,
+                'bank_account_id': p.accountId,
+                'account_id': p.accountId,
+                'balance': p.balance,
+              })
+          .toList();
+      final cardsPayload = (cards ?? [])
+          .map((c) => {'id': c.id, 'name': c.name, 'entity': c.entity, 'last_four_digits': c.lastFourDigits})
+          .toList();
+
       final catalogPayload = {
-        'accounts': (accounts ?? []).map((a) => {'id': a.id, 'name': a.name}).toList(),
-        'cards': (cards ?? [])
-            .map((c) => {'id': c.id, 'name': c.name, 'entity': c.entity, 'last_four_digits': c.lastFourDigits})
-            .toList(),
-        'pockets': (pockets ?? [])
-            .map((p) => {'id': p.id, 'name': p.name, 'account_id': p.accountId, 'balance': p.balance})
-            .toList(),
+        'accounts': accountsPayload,
+        'cards': cardsPayload,
+        'pockets': pocketsPayload,
       };
 
       final data = await _invoke('parse_intent', {
         'text': text,
         'catalog': catalogPayload,
+        'available_accounts': accountsPayload,
+        'available_pockets': pocketsPayload,
       });
 
       if (data['success'] != true || data['intent'] == null) {
@@ -228,13 +240,35 @@ class AiAssistantService {
       }
 
       final intentMap = data['intent'] as Map<String, dynamic>;
-      final intentType = intentMap['intent_type']?.toString().toLowerCase();
+      final intentType = (intentMap['intent_type'] ?? intentMap['operation'])?.toString().toLowerCase();
 
       final amount = (intentMap['amount'] as num?)?.toInt();
-      final sourceTypeStr = intentMap['source_type']?.toString().toLowerCase();
-      final sourceId = intentMap['source_id']?.toString();
-      final pocketId = intentMap['pocket_id']?.toString();
-      final description = intentMap['description']?.toString() ?? '';
+      final sourceTypeStr = (intentMap['source_type'] ?? (intentMap['bank_account'] != null ? 'account' : null))
+          ?.toString()
+          .toLowerCase();
+
+      String? sourceId = intentMap['source_id']?.toString();
+      final bankName = (intentMap['bank_account'] ?? intentMap['source_name'])?.toString();
+      if ((sourceId == null || sourceId.isEmpty) && bankName != null && accounts != null) {
+        final norm = bankName.toLowerCase().trim();
+        final match = accounts
+            .where((a) => a.name.toLowerCase().contains(norm) || norm.contains(a.name.toLowerCase()))
+            .firstOrNull;
+        if (match != null) sourceId = match.id;
+      }
+
+      String? pocketId = intentMap['pocket_id']?.toString();
+      final pocketName = (intentMap['pocket'] ?? intentMap['pocket_name'])?.toString();
+      if ((pocketId == null || pocketId.isEmpty) && pocketName != null && pockets != null) {
+        final norm = pocketName.toLowerCase().trim();
+        final match = pockets
+            .where((p) => sourceId == null || p.accountId == sourceId)
+            .where((p) => p.name.toLowerCase().contains(norm) || norm.contains(p.name.toLowerCase()))
+            .firstOrNull;
+        if (match != null) pocketId = match.id;
+      }
+
+      final description = (intentMap['note'] ?? intentMap['description'])?.toString() ?? '';
 
       final SourceType? sourceType = sourceTypeStr == 'card'
           ? SourceType.card
@@ -419,11 +453,29 @@ class AiAssistantService {
   Future<ParsedReceiptResult> parseReceipt({
     required String imageBase64,
     String mimeType = 'image/jpeg',
+    List<Account>? availableAccounts,
+    List<Pocket>? availablePockets,
   }) async {
-    final data = await _invoke('parse_receipt', {
+    final payload = <String, dynamic>{
       'image_base64': imageBase64,
       'mime_type': mimeType,
-    });
+    };
+    if (availableAccounts != null && availableAccounts.isNotEmpty) {
+      payload['available_accounts'] =
+          availableAccounts.map((a) => {'id': a.id, 'name': a.name}).toList();
+    }
+    if (availablePockets != null && availablePockets.isNotEmpty) {
+      payload['available_pockets'] = availablePockets
+          .map((p) => {
+                'id': p.id,
+                'name': p.name,
+                'bank_account_id': p.accountId,
+                'account_id': p.accountId,
+              })
+          .toList();
+    }
+
+    final data = await _invoke('parse_receipt', payload);
 
     if (data['success'] == true && data['receipt'] != null) {
       return ParsedReceiptResult.fromJson(data['receipt'] as Map<String, dynamic>);

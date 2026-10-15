@@ -15,9 +15,11 @@ interface ParseIntentRequest {
   text: string;
   catalog?: {
     accounts?: Array<{ id: string; name: string }>;
-    pockets?: Array<{ id: string; name: string; account_id?: string; balance?: number }>;
+    pockets?: Array<{ id: string; name: string; account_id?: string; bank_account_id?: string; balance?: number }>;
     cards?: Array<{ id: string; name: string; entity?: string; last_four_digits?: string }>;
   };
+  available_accounts?: Array<{ id: string; name: string }>;
+  available_pockets?: Array<{ id: string; name: string; account_id?: string; bank_account_id?: string }>;
 }
 
 interface ChatCopilotRequest {
@@ -46,6 +48,8 @@ interface ParseReceiptRequest {
   action: "parse_receipt";
   image_base64: string;
   mime_type?: string;
+  available_accounts?: Array<{ id: string; name: string }>;
+  available_pockets?: Array<{ id: string; name: string; account_id?: string; bank_account_id?: string }>;
 }
 
 interface WebhookIngestRequest {
@@ -126,13 +130,21 @@ serve(async (req: Request) => {
     const action = body.action;
 
     if (action === "parse_intent") {
-      const { text, catalog } = body;
-      const catalogInfo = JSON.stringify(catalog ?? {}, null, 2);
+      const { text, catalog, available_accounts, available_pockets } = body as ParseIntentRequest;
+      const accountsList = available_accounts || catalog?.accounts || [];
+      const pocketsList = available_pockets || catalog?.pockets || [];
+      const cardsList = catalog?.cards || [];
+      const catalogInfo = JSON.stringify({
+        available_accounts: accountsList,
+        available_pockets: pocketsList,
+        cards: cardsList,
+      }, null, 2);
 
       const systemPrompt = `Eres el Asistente Financiero Inteligente de Colombia para Finanzas Personales.
 Tu tarea es analizar frases en lenguaje natural (escritas o dictadas por voz) y clasificarlas en una estructura JSON estricta.
 Debes entender perfectamente modismos, jerga financiera colombiana y términos coloquiales:
 - "lucas" o "barras" = miles de pesos (ej: "45 barras" = 45000 COP, "50 lucas" = 50000 COP, "media luca" = 500 COP, "10 barras" = 10000 COP).
+- "mil" o "k" = miles de pesos (ej: "15 mil" = 15000 COP).
 - "palos" = millones de pesos (ej: "2 palos" = 2000000 COP).
 - REGLAS ESTRICTAS DE DIRECCIONALIDAD BANCARIA EN COLOMBIA (Ingreso vs Gasto):
   * INGRESOS (intent_type: "income"):
@@ -154,26 +166,40 @@ Debes entender perfectamente modismos, jerga financiera colombiana y términos c
 - "crea bolsillo", "crear bolsillo", "nuevo bolsillo" = create_pocket.
 - "crea cuenta", "crear cuenta", "abrir cuenta" = create_account.
 
-Catálogo actual del usuario (cuentas, bolsillos y tarjetas existentes):
+Cuentas y bolsillos disponibles del usuario actual:
 ${catalogInfo}
 
-Si el usuario menciona un banco o bolsillo, busca el ID más coincidente en el catálogo actual.
-Si es una creación, extrae los datos correspondientes.
+REGLAS DE EMPAREJAMIENTO DE CUENTAS Y BOLSILLOS:
+1. Compara nombres de cuentas y bolsillos ignorando mayúsculas/minúsculas, tildes y preposiciones o conectores ("en el bolsillo", "desde el bolsillo", "del bolsillo", "de bolsillo", "bolsillo", "desde la cuenta", "en la cuenta", "cuenta", "por", "en", "desde", "con", "a").
+2. Si el usuario dice "me gasté 15 mil en almuerzo desde nequi bolsillo personal", mapea con máxima precisión:
+   - operation / intent_type: "expense"
+   - amount: 15000
+   - bank_account / source_name: "Nequi"
+   - source_id: id correspondiente de la cuenta Nequi en available_accounts
+   - source_type: "account"
+   - pocket / pocket_name: "Personal"
+   - pocket_id: id correspondiente del bolsillo Personal en available_pockets
+   - note / description: "Almuerzo"
+3. Si el usuario menciona un banco o bolsillo existente, enlaza siempre su source_id y pocket_id correspondientes desde el catálogo.
 
 Debes responder ÚNICAMENTE con un JSON válido sin markdown ni comillas triples:
 {
   "intent_type": "expense" | "income" | "transfer" | "card_payment" | "create_recurring" | "create_card" | "create_pocket" | "create_account",
+  "operation": "expense" | "income" | "transfer" | "card_payment" | "create_recurring" | "create_card" | "create_pocket" | "create_account",
   "amount": number | null,
   "source_type": "account" | "card" | null,
   "source_id": string | null,
   "source_name": string | null,
+  "bank_account": string | null,
   "pocket_id": string | null,
   "pocket_name": string | null,
+  "pocket": string | null,
   "to_pocket_id": string | null,
   "to_pocket_name": string | null,
   "target_card_id": string | null,
   "target_card_name": string | null,
   "description": string,
+  "note": string,
   "recurring": {
     "name": string,
     "amount": number,
@@ -336,7 +362,7 @@ Responde ÚNICAMENTE en JSON válido:
     }
 
     if (action === "parse_receipt") {
-      const { image_base64, mime_type } = body as ParseReceiptRequest;
+      const { image_base64, mime_type, available_accounts, available_pockets } = body as ParseReceiptRequest;
       if (!image_base64) {
         return new Response(JSON.stringify({ error: "No se proporcionó 'image_base64' para analizar." }), {
           status: 400,
@@ -348,8 +374,17 @@ Responde ÚNICAMENTE en JSON válido:
       const cleanBase64 = image_base64.replace(/^data:[a-zA-Z0-9\/+-]+;base64,/, "").trim();
       const resolvedMime = (mime_type || "image/jpeg").toLowerCase();
 
+      const userContextInfo = [];
+      if (available_accounts && available_accounts.length > 0) {
+        userContextInfo.push(`Cuentas disponibles del usuario:\n${JSON.stringify(available_accounts, null, 2)}`);
+      }
+      if (available_pockets && available_pockets.length > 0) {
+        userContextInfo.push(`Bolsillos disponibles del usuario:\n${JSON.stringify(available_pockets, null, 2)}`);
+      }
+      const contextSection = userContextInfo.length > 0 ? `\n\nContexto del usuario:\n${userContextInfo.join("\n\n")}\nUsa las cuentas o bolsillos del usuario si coinciden con la entidad detectada.` : "";
+
       const systemPrompt = `Eres Sof.IA, experta en visión artificial y procesamiento forense de comprobantes bancarios en Colombia.
-Analiza la imagen adjunta correspondiente a un comprobante o captura de pantalla de transferencia bancaria (Nequi, Bancolombia, Daviplata, Dale, Nu, Transfiya, Lulo, Davivienda, etc.).
+Analiza la imagen adjunta correspondiente a un comprobante o captura de pantalla de transferencia bancaria (Nequi, Bancolombia, Daviplata, Dale, Nu, Transfiya, Lulo, Davivienda, etc.).${contextSection}
 Reglas de extracción:
 1. Detecta la entidad bancaria o billetera emisora por los colores, tipografía y logotipo (ej: Nequi = fucsia/morado, Bancolombia = franja amarilla/blanca/negra, Daviplata = rojo casita, Nu = morado).
 2. Discrimina con total exactitud la DIRECCIONALIDAD:

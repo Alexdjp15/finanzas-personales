@@ -298,7 +298,42 @@ class NlpParser {
     return localResult;
   }
 
-  static ParsedTransaction parse(String input, NlpCatalog catalog) {
+  static ParsedTransaction parse(
+    String input,
+    NlpCatalog catalog, {
+    List<Account>? availableAccounts,
+    List<Pocket>? availablePockets,
+  }) {
+    NlpCatalog effectiveCatalog = catalog;
+    if ((availableAccounts != null && availableAccounts.isNotEmpty) ||
+        (availablePockets != null && availablePockets.isNotEmpty)) {
+      final accTargets = [...catalog.accounts];
+      if (availableAccounts != null) {
+        for (final a in availableAccounts) {
+          if (!accTargets.any((t) => t.id == a.id)) {
+            accTargets.add(NlpTarget(id: a.id, aliases: [a.name.toLowerCase()]));
+          }
+        }
+      }
+      final pocketTargets = [...catalog.pockets];
+      if (availablePockets != null) {
+        for (final p in availablePockets) {
+          if (!pocketTargets.any((t) => t.id == p.id)) {
+            pocketTargets.add(NlpPocketTarget(
+              id: p.id,
+              accountId: p.accountId,
+              aliases: [p.name.toLowerCase()],
+            ));
+          }
+        }
+      }
+      effectiveCatalog = NlpCatalog(
+        accounts: accTargets,
+        cards: catalog.cards,
+        pockets: pocketTargets,
+      );
+    }
+
     final text = _normalize(input);
     final issues = <ParseIssue>[];
 
@@ -306,7 +341,7 @@ class NlpParser {
 
     // 1. Check entity creation intents first
     if (_createPocketPattern.hasMatch(text)) {
-      final intent = _parseCreatePocket(text, catalog, amount);
+      final intent = _parseCreatePocket(text, effectiveCatalog, amount);
       return ParsedTransaction(
         amount: intent.initialBalance,
         kind: TransactionKind.expense,
@@ -345,7 +380,7 @@ class NlpParser {
     }
 
     if (_createRecurringPattern.hasMatch(text)) {
-      final intent = _parseCreateRecurring(text, catalog, amount);
+      final intent = _parseCreateRecurring(text, effectiveCatalog, amount);
       return ParsedTransaction(
         amount: intent.amount,
         kind: TransactionKind.expense,
@@ -361,7 +396,7 @@ class NlpParser {
     final isExplicitIncome = _incomePriorityPattern.hasMatch(text);
 
     if (!isExplicitIncome && _transferPattern.hasMatch(text) && (text.contains(' de ') || text.contains(' desde '))) {
-      final intent = _parseTransfer(text, catalog, amount);
+      final intent = _parseTransfer(text, effectiveCatalog, amount);
       if (amount == null) issues.add(ParseIssue.missingAmount);
       return ParsedTransaction(
         amount: amount,
@@ -377,8 +412,8 @@ class NlpParser {
     // 3. Regular transaction parsing (Expense, Income, CardPayment)
     if (amount == null) issues.add(ParseIssue.missingAmount);
 
-    final expandedAccounts = _expandAccountTargets(catalog.accounts);
-    final expandedCards = _expandCardTargets(catalog.cards);
+    final expandedAccounts = _expandAccountTargets(effectiveCatalog.accounts);
+    final expandedCards = _expandCardTargets(effectiveCatalog.cards);
 
     final accountMatch = _bestMatch(text, expandedAccounts);
     final cardMatch = _bestMatch(text, expandedCards);
@@ -415,9 +450,9 @@ class NlpParser {
       sourceId = accountMatch.id;
     } else {
       // Unspecified source: auto-select primary account if available
-      if (catalog.accounts.isNotEmpty) {
+      if (effectiveCatalog.accounts.isNotEmpty) {
         sourceType = SourceType.account;
-        sourceId = catalog.accounts.first.id;
+        sourceId = effectiveCatalog.accounts.first.id;
       } else {
         issues.add(ParseIssue.unknownSource);
       }
@@ -445,11 +480,13 @@ class NlpParser {
     // If it's a normal card charge, card expense doesn't need or restrict pockets
     // If it's card payment or account movement, resolve pocket from catalog
     String? pocketId;
+    _Match pocketMatch = const _Match(null, false, 0, null);
     if (sourceType == SourceType.card && !isCardPayment) {
       // Normal card charge does not require a pocket
       pocketId = null;
     } else {
-      pocketId = _resolvePocket(text, catalog, sourceType, sourceId, issues, isCardPayment);
+      pocketMatch = _resolvePocketMatch(text, effectiveCatalog, sourceType, sourceId, issues, isCardPayment);
+      pocketId = pocketMatch.id;
     }
 
     // Build typed intent
@@ -472,12 +509,17 @@ class NlpParser {
         description: cleanDesc,
       );
     } else {
+      final cleanDesc = _extractCleanExpenseDescription(
+        input,
+        matchedSourceAlias: accountMatch.matchedAlias ?? cardMatch.matchedAlias,
+        matchedPocketAlias: pocketMatch.matchedAlias,
+      );
       intent = ExpenseIntent(
         amount: amount,
         sourceType: sourceType,
         sourceId: sourceId,
         pocketId: pocketId,
-        description: text,
+        description: cleanDesc,
       );
     }
 
@@ -723,7 +765,7 @@ class NlpParser {
     text = text.replaceAll(RegExp(r'\b(?:a\s+la\s+cuenta\s+de|a\s+la\s+cta\s+de|a\s+la\s+cuenta|a\s+la\s+cta|a\s+mi\s+cuenta\s+de|a\s+mi\s+cuenta)\b', caseSensitive: false), ' ');
 
     // 3. Remove amounts and currencies
-    text = text.replaceAll(RegExp(r'(\d+(?:[.,]\d+)?)\s*(?:palos?|millones?|millon|lucas?|barras?|k)\b', caseSensitive: false), ' ');
+    text = text.replaceAll(RegExp(r'(\d+(?:[.,]\d+)?)\s*(?:palos?|millones?|millon|lucas?|barras?|k|mil)\b', caseSensitive: false), ' ');
     text = text.replaceAll(RegExp(r'(?<![\d.,])(\d{1,3}(?:[.,]\d{3})+|\d+)(?![\d])'), ' ');
     text = text.replaceAll(RegExp(r'\b(?:pesos?|cop|dolares?|usd)\b', caseSensitive: false), ' ');
     text = text.replaceAll(r'$', ' ');
@@ -737,6 +779,73 @@ class NlpParser {
 
     if (text.isEmpty) {
       return 'Ingreso';
+    }
+
+    return _capitalizeWords(text);
+  }
+
+  static final _expenseTriggerPattern = RegExp(
+    r'(?<![a-záéíóúüñ])(?:me\s+gaste|me\s+gasté|gaste|gasté|pague|pagué|compre|compré|debito\s+por|débito\s+por|retiro\s+de|retiro\s+en|compra\s+en|compra\s+por|pago\s+de|pago)(?![a-záéíóúüñ])',
+    caseSensitive: false,
+  );
+
+  static String _extractCleanExpenseDescription(
+    String rawInput, {
+    String? matchedSourceAlias,
+    String? matchedPocketAlias,
+  }) {
+    String text = rawInput;
+
+    // 1. Remove expense trigger prefix
+    text = text.replaceAll(_expenseTriggerPattern, ' ');
+
+    // 2. Remove matched bank/account/card and common connectors
+    if (matchedSourceAlias != null && matchedSourceAlias.trim().isNotEmpty) {
+      final bankPattern = RegExp(
+        r'(?<![a-záéíóúüñ])(?:desde\s+la\s+cuenta\s+de|desde\s+la\s+cuenta|desde\s+mi\s+cuenta|en\s+la\s+cuenta\s+de|en\s+la\s+cuenta|a\s+la\s+cuenta\s+de|a\s+la\s+cuenta|tarjeta\s+de\s+credito\s+de|tarjeta\s+de\s+credito|tarjeta\s+de|tarjeta|tc\s+de|tc|cuenta\s+de|cuenta|desde|en|de|con|por)\s+' +
+            RegExp.escape(matchedSourceAlias) +
+            r'(?![a-záéíóúüñ])',
+        caseSensitive: false,
+      );
+      text = text.replaceAll(bankPattern, ' ');
+      text = text.replaceAll(RegExp('(?<![a-záéíóúüñ])${RegExp.escape(matchedSourceAlias)}(?![a-záéíóúüñ])', caseSensitive: false), ' ');
+    }
+
+    // 3. Remove matched pocket and common connectors
+    if (matchedPocketAlias != null && matchedPocketAlias.trim().isNotEmpty) {
+      final pocketPattern = RegExp(
+        r'(?<![a-záéíóúüñ])(?:desde\s+el\s+bolsillo\s+de|desde\s+el\s+bolsillo|en\s+el\s+bolsillo\s+de|en\s+el\s+bolsillo|del\s+bolsillo\s+de|del\s+bolsillo|de\s+bolsillo|bolsillo\s+de|bolsillo|desde|en|de)\s+' +
+            RegExp.escape(matchedPocketAlias) +
+            r'(?![a-záéíóúüñ])',
+        caseSensitive: false,
+      );
+      text = text.replaceAll(pocketPattern, ' ');
+      text = text.replaceAll(RegExp('(?<![a-záéíóúüñ])${RegExp.escape(matchedPocketAlias)}(?![a-záéíóúüñ])', caseSensitive: false), ' ');
+    }
+
+    // Also remove generic connector phrases
+    text = text.replaceAll(RegExp(r'(?<![a-záéíóúüñ])(?:desde\s+el\s+bolsillo|en\s+el\s+bolsillo|del\s+bolsillo|de\s+bolsillo|bolsillo)(?![a-záéíóúüñ])', caseSensitive: false), ' ');
+    text = text.replaceAll(RegExp(r'(?<![a-záéíóúüñ])(?:desde\s+la\s+cuenta|en\s+la\s+cuenta|tarjeta\s+de\s+credito|tarjeta|tc)(?![a-záéíóúüñ])', caseSensitive: false), ' ');
+
+    // 4. Remove amounts and currencies
+    text = text.replaceAll(RegExp(r'(\d+(?:[.,]\d+)?)\s*(?:palos?|millones?|millon|lucas?|barras?|k|mil)(?![a-záéíóúüñ])', caseSensitive: false), ' ');
+    text = text.replaceAll(RegExp(r'(?<![\d.,])(\d{1,3}(?:[.,]\d{3})+|\d+)(?![\d])'), ' ');
+    text = text.replaceAll(RegExp(r'(?<![a-záéíóúüñ])(?:pesos?|cop|dolares?|usd)(?![a-záéíóúüñ])', caseSensitive: false), ' ');
+    text = text.replaceAll(r'$', ' ');
+
+    // 5. Remove leading/trailing filler prepositions and conjunctions
+    while (RegExp(r'^\s*(?:en|de|por|para|desde|con|a)\s+', caseSensitive: false).hasMatch(text)) {
+      text = text.replaceFirst(RegExp(r'^\s*(?:en|de|por|para|desde|con|a)\s+', caseSensitive: false), ' ');
+    }
+    while (RegExp(r'\s+(?:en|de|por|para|desde|con|a)\s*$', caseSensitive: false).hasMatch(text)) {
+      text = text.replaceFirst(RegExp(r'\s+(?:en|de|por|para|desde|con|a)\s*$', caseSensitive: false), ' ');
+    }
+
+    // Clean whitespace and punctuation
+    text = text.replaceAll(RegExp(r'[^\w\s\u00C0-\u00FF]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    if (text.isEmpty) {
+      return 'Gasto';
     }
 
     return _capitalizeWords(text);
@@ -769,7 +878,26 @@ class NlpParser {
     }).toList();
   }
 
-  static String? _resolvePocket(
+  static List<NlpPocketTarget> _expandPocketTargets(List<NlpPocketTarget> pockets) {
+    return pockets.map((p) {
+      final expandedAliases = <String>{};
+      for (final alias in p.aliases) {
+        final norm = _normalize(alias);
+        expandedAliases.add(norm);
+        expandedAliases.add('bolsillo $norm');
+        expandedAliases.add('del bolsillo $norm');
+        expandedAliases.add('de bolsillo $norm');
+        expandedAliases.add('en el bolsillo $norm');
+        expandedAliases.add('desde el bolsillo $norm');
+        expandedAliases.add('el bolsillo $norm');
+        expandedAliases.add('en bolsillo $norm');
+        expandedAliases.add('desde bolsillo $norm');
+      }
+      return NlpPocketTarget(id: p.id, accountId: p.accountId, aliases: expandedAliases.toList());
+    }).toList();
+  }
+
+  static _Match _resolvePocketMatch(
     String text,
     NlpCatalog catalog,
     SourceType? sourceType,
@@ -777,19 +905,17 @@ class NlpParser {
     List<ParseIssue> issues,
     bool isCardPayment,
   ) {
-    // When paying a card, pockets can come from any account; when account movement, filter by that account
     final accountFilter = (sourceType == SourceType.account && !isCardPayment) ? sourceId : null;
     final candidates = catalog.pockets
         .where((pocket) => accountFilter == null || pocket.accountId == accountFilter)
-        .where((pocket) => pocket.aliases.any((alias) => _containsAlias(text, alias)))
-        .map((pocket) => pocket.id)
-        .toSet();
+        .toList();
+    final expanded = _expandPocketTargets(candidates);
+    final match = _bestMatch(text, expanded);
 
-    if (candidates.length > 1) {
+    if (match.ambiguous) {
       issues.add(ParseIssue.ambiguousPocket);
-      return null;
     }
-    return candidates.isEmpty ? null : candidates.single;
+    return match;
   }
 
   static int? _extractAmount(String text) {
@@ -808,8 +934,8 @@ class NlpParser {
       if (val != null) return (val * 1000000).round();
     }
 
-    // 3. Thousands / lucas / barras / k: "45 barras", "50 lucas", "10k"
-    final thousandMatch = RegExp(r'(\d+(?:[.,]\d+)?)\s*(?:lucas?|barras?|k)\b').firstMatch(lower);
+    // 3. Thousands / lucas / barras / k / mil: "45 barras", "50 lucas", "10k", "15 mil"
+    final thousandMatch = RegExp(r'(\d+(?:[.,]\d+)?)\s*(?:lucas?|barras?|k|mil)\b').firstMatch(lower);
     if (thousandMatch != null) {
       final raw = thousandMatch.group(1)!.replaceAll(',', '.');
       final val = double.tryParse(raw);

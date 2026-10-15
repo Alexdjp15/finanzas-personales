@@ -1,6 +1,7 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'package:finanzas_personales/domain/models/models.dart';
 import 'package:finanzas_personales/domain/services/ai_assistant_service.dart';
 import 'package:finanzas_personales/domain/services/nlp_parser.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('AiAssistantService', () {
@@ -371,6 +372,78 @@ void main() {
       expect(result['success'], isTrue);
       expect(result['status'], 'ingested');
       expect(result['parsed_intent']['amount'], 25000);
+    });
+
+    test('parseIntentWithAi sends available_accounts and available_pockets and maps bank_account/pocket/note', () async {
+      final mockService = AiAssistantService(
+        functionInvoker: (action, payload) async {
+          expect(action, 'parse_intent');
+          expect(payload['available_accounts'], isA<List>());
+          expect(payload['available_pockets'], isA<List>());
+          final accs = payload['available_accounts'] as List;
+          expect(accs.any((a) => a['id'] == 'acc-nequi'), isTrue);
+          final pcks = payload['available_pockets'] as List;
+          expect(pcks.any((p) => p['id'] == 'pck-personal'), isTrue);
+
+          return {
+            'success': true,
+            'intent': {
+              'operation': 'expense',
+              'amount': 15000,
+              'bank_account': 'Nequi',
+              'source_id': 'acc-nequi',
+              'pocket': 'Personal',
+              'pocket_id': 'pck-personal',
+              'note': 'Almuerzo',
+            },
+          };
+        },
+      );
+
+      final result = await mockService.parseIntentWithAi(
+        text: 'me gasté 15 mil en almuerzo desde nequi bolsillo personal',
+        catalog: NlpCatalog.empty,
+        accounts: const [Account(id: 'acc-nequi', name: 'Nequi')],
+        pockets: const [Pocket(id: 'pck-personal', accountId: 'acc-nequi', name: 'Personal', balance: 0)],
+      );
+
+      expect(result, isNotNull);
+      expect(result!.amount, 15000);
+      expect(result.sourceId, 'acc-nequi');
+      expect(result.pocketId, 'pck-personal');
+      expect(result.intent, isA<ExpenseIntent>());
+      expect((result.intent as ExpenseIntent).description, 'Almuerzo');
+    });
+
+    test('parseReceipt passes available_accounts and available_pockets with image/jpeg mimeType', () async {
+      final mockService = AiAssistantService(
+        functionInvoker: (action, payload) async {
+          expect(action, 'parse_receipt');
+          expect(payload['mime_type'], 'image/jpeg');
+          expect(payload['available_accounts'], isNotNull);
+          expect(payload['available_pockets'], isNotNull);
+          return {
+            'success': true,
+            'receipt': {
+              'operation': 'expense',
+              'amount': 15000,
+              'bank_name': 'Nequi',
+              'description': 'Envío Nequi Almuerzo',
+            },
+          };
+        },
+      );
+
+      final result = await mockService.parseReceipt(
+        imageBase64: 'fake_jpeg_base64',
+        mimeType: 'image/jpeg',
+        availableAccounts: const [Account(id: 'acc-1', name: 'Nequi')],
+        availablePockets: const [Pocket(id: 'pck-1', accountId: 'acc-1', name: 'Personal', balance: 0)],
+      );
+
+      expect(result.amount, 15000);
+      expect(result.bankName, 'Nequi');
+      expect(result.isIncome, isFalse);
     });
   });
 }
