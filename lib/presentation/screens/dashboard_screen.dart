@@ -73,6 +73,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     _hasHandledUrlAction = true;
 
     final action = (widget.initialAction ?? DashboardScreen.getUrlAction())?.trim().toLowerCase();
+    final uri = Uri.base;
+    final isDemoReq = uri.queryParameters['demo'] == 'true' ||
+        uri.queryParameters['demo'] == '1' ||
+        action == 'demo';
+
+    if (isDemoReq) {
+      final currentUsername = ref.read(currentUsernameProvider);
+      if (currentUsername != 'demo_tester') {
+        ref.read(authRepositoryProvider).signOut().then((_) {
+          ref.read(authRepositoryProvider).signIn(identifier: 'demo_tester', password: 'Password123!');
+        });
+        return;
+      }
+    }
+
     if (action == 'nlp') {
       showDialog(
         context: context,
@@ -297,6 +312,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final colors = AppColors.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final currentUsername = ref.watch(currentUsernameProvider);
+    final isDemoUser = currentUsername == 'demo_tester';
+
     final isMobile = MediaQuery.sizeOf(context).width < 600;
     final iconPadding = isMobile ? EdgeInsets.zero : const EdgeInsets.all(8);
     final iconConstraints = isMobile ? const BoxConstraints.tightFor(width: 32, height: 32) : null;
@@ -340,15 +358,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
             SizedBox(width: isMobile ? 8 : 12),
             Flexible(
-              child: Text(
-                isMobile ? 'Finanzas' : 'Finanzas Personales',
-                style: TextStyle(
-                  color: colors.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: isMobile ? 16 : 18,
-                  letterSpacing: -0.4,
-                ),
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isMobile ? 'Finanzas' : 'Finanzas Personales',
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: isMobile ? 15 : 17,
+                      letterSpacing: -0.4,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (currentUsername != null && currentUsername.isNotEmpty)
+                    Text(
+                      isDemoUser ? '● Modo Demo (@$currentUsername)' : '@$currentUsername',
+                      style: TextStyle(
+                        color: isDemoUser ? const Color(0xFFD97706) : colors.textSecondary,
+                        fontSize: 10,
+                        fontWeight: isDemoUser ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
               ),
             ),
           ],
@@ -431,6 +465,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             onPressed: () async {
               final authRepo = ref.read(authRepositoryProvider);
               await authRepo.signOut();
+              invalidateFinanceProviders(ref);
             },
           ),
           SizedBox(width: isMobile ? 6 : 12),

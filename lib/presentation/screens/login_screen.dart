@@ -22,12 +22,56 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   String? _errorMessage;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final uri = Uri.base;
+      final isDemoReq = uri.queryParameters['demo'] == 'true' ||
+          uri.queryParameters['demo'] == '1' ||
+          uri.queryParameters['action'] == 'demo';
+      if (isDemoReq && mounted && !_isSignUp) {
+        _loginDemoUser();
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _identifierController.dispose();
     _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loginDemoUser() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _identifierController.text = 'demo_tester';
+      _passwordController.text = 'Password123!';
+    });
+
+    try {
+      final authRepo = ref.read(authRepositoryProvider);
+      await authRepo.signIn(identifier: 'demo_tester', password: 'Password123!');
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          if (e is StateError) {
+            _errorMessage = e.message;
+          } else {
+            _errorMessage = e.toString().replaceFirst('Exception: ', '').replaceFirst('Bad state: ', '');
+          }
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _toggleSignUpMode() {
@@ -331,6 +375,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                               ),
                       ),
+                      if (!_isSignUp) ...[
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          key: const Key('btn_login_demo'),
+                          onPressed: _isLoading ? null : _loginDemoUser,
+                          icon: const Icon(Icons.flash_on_rounded, size: 18, color: Color(0xFFD97706)),
+                          label: const Text(
+                            'Entrar a Cuenta Demo',
+                            style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFB45309)),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFFCD34D), width: 1.5),
+                            backgroundColor: const Color(0xFFFEF3C7),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
 
                       // Toggle Button

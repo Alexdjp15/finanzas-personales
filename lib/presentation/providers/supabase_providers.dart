@@ -23,3 +23,14 @@ final authStateProvider = StreamProvider<bool>((ref) {
   final authRepo = ref.watch(authRepositoryProvider);
   return authRepo.authStateChanges();
 });
+
+final currentUsernameProvider = Provider<String?>((ref) {
+  try {
+    ref.watch(authStateProvider);
+    final authRepo = ref.watch(authRepositoryProvider);
+    return authRepo.currentUsername;
+  } catch (_) {
+    return null;
+  }
+});
+

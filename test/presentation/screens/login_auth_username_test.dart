@@ -19,6 +19,9 @@ class MockAuthRepository implements AuthRepository {
   String? get currentUserId => 'mock-user-123';
 
   @override
+  String? get currentUsername => 'mock_tester';
+
+  @override
   Stream<bool> authStateChanges() => Stream.value(true);
 
   @override
@@ -236,6 +239,19 @@ void main() {
 
       expect(find.text('El nombre de usuario no puede contener "@"'), findsOneWidget);
       expect(mockAuthRepo.lastSignUpUsername, isNull);
+    });
+
+    testWidgets('renders Demo Quick Access button and logs in demo_tester on tap', (tester) async {
+      await initLoginScreen(tester);
+
+      expect(find.byKey(const Key('btn_login_demo')), findsOneWidget);
+      expect(find.text('Entrar a Cuenta Demo'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('btn_login_demo')));
+      await tester.pumpAndSettle();
+
+      expect(mockAuthRepo.lastIdentifier, 'demo_tester');
+      expect(mockAuthRepo.lastPassword, 'Password123!');
     });
   });
 }

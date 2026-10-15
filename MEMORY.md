@@ -1185,3 +1185,29 @@ Este archivo conserva el contexto histórico, el estado técnico, las decisiones
 - Migración [`supabase/migrations/20261015160000_recurring_payments_allow_zero_amount.sql`](file:///supabase/migrations/20261015160000_recurring_payments_allow_zero_amount.sql): actualizó el constraint `recurring_payments_amount_check` de `amount > 0` a `amount >= 0`, permitiendo persistir recordatorios de servicios públicos y facturas variables con valor $0 COP sin error de base de datos.
 - Utilidad repetible de siembra: [`tool/seed_test_user.dart`](file:///tool/seed_test_user.dart), ejecutable en cualquier momento con `dart run tool/seed_test_user.dart` para restablecer el entorno de prueba con datos frescos sin tocar ninguna otra cuenta.
 
+---
+
+## 34. Persistencia de Sesión Móvil y Acceso Rápido a Modo Demo (2026-10-15)
+
+### 34.1. Causa Raíz Identificada
+- **Persistencia en LocalStorage:** El navegador web del teléfono almacena el token JWT de la sesión activa de Supabase (`alexdjp15@gmail.com`). Al abrir la URL, Supabase restaura automáticamente la sesión sin volver a solicitar credenciales, cargando el dashboard de la cuenta personal si no se había cerrado sesión previamente.
+
+### 34.2. Soluciones Implementadas
+1. **Botón "⚡ Entrar a Cuenta Demo" en LoginScreen ([`lib/presentation/screens/login_screen.dart`](file:///lib/presentation/screens/login_screen.dart)):**
+   - Botón visible con estilo ámbar destacado en la pantalla de inicio de sesión (`Key('btn_login_demo')`).
+   - Al tocarlo en móvil o escritorio, llena automáticamente las credenciales (`demo_tester` / `Password123!`) e inicia sesión en 1 solo toque sin necesidad de escribir en el teclado móvil.
+2. **Soporte de Conmutación Automática por URL:**
+   - Si se abre la app con el parámetro `?demo=true`, `?demo=1` o `?action=demo`:
+     - En `LoginScreen`: ejecuta inmediatamente el inicio de sesión como usuario demo.
+     - En `DashboardScreen`: si la sesión activa actual no es `demo_tester` (por ejemplo, `alexdjp15`), cierra automáticamente la sesión actual e inicia sesión directamente con el usuario demo.
+3. **Indicador Visual del Usuario Activo en el AppBar ([`lib/presentation/screens/dashboard_screen.dart`](file:///lib/presentation/screens/dashboard_screen.dart)):**
+   - Subtítulo tipográfico claro debajo de "Finanzas":
+     - Para la cuenta demo: `● Modo Demo (@demo_tester)` en color ámbar de alto contraste.
+     - Para la cuenta personal: `@alexdjp15` en color secundario sutil.
+   - Permite al usuario verificar inmediatamente en qué cuenta está operando.
+4. **Invalidación de Caché de Estado en Logout:**
+   - Al pulsar el botón de cerrar sesión (icono de salida en el AppBar), se ejecuta `invalidateFinanceProviders(ref)` asegurando que todos los providers de Riverpod limpien los datos en memoria antes de volver a la pantalla de login.
+5. **Pruebas y Calidad:**
+   - 187 de 187 tests unitarios y de widgets pasando al 100% en verde.
+
+
