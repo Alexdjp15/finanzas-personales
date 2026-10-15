@@ -56,6 +56,19 @@ Future<void> main() async {
     print('Aviso perfil: $e');
   }
 
+  // Asegurar registro en user_settings con onboarding_completed = true
+  try {
+    await client.from('user_settings').upsert({
+      'user_id': user.id,
+      'onboarding_completed': true,
+      'reminder_hour': 8,
+      'reminder_minute': 0,
+    });
+    print('✓ Configuración asegurada en tabla user_settings (onboarding_completed: true).');
+  } catch (e) {
+    print('Aviso user_settings: $e');
+  }
+
   // 2. Verificar si ya tiene cuentas creadas
   final existingAccounts = await client.from('accounts').select('id, name');
   if ((existingAccounts as List).isNotEmpty) {

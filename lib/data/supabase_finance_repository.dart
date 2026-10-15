@@ -172,6 +172,25 @@ class SupabaseFinanceRepository implements FinanceRepository {
     required String name,
     required Cop initialBalance,
   }) async {
+    final existing = await _client
+        .from('pockets')
+        .select('id, account_id, name, balance')
+        .eq('account_id', accountId)
+        .eq('name', name)
+        .maybeSingle();
+
+    if (existing != null) {
+      if (initialBalance > 0) {
+        await _client.from('pockets').update({'balance': initialBalance}).eq('id', existing['id']);
+      }
+      return Pocket(
+        id: existing['id'] as String,
+        accountId: existing['account_id'] as String,
+        name: existing['name'] as String,
+        balance: initialBalance > 0 ? initialBalance : (existing['balance'] as num).toInt(),
+      );
+    }
+
     final res = await _client
         .from('pockets')
         .insert({
@@ -624,7 +643,19 @@ class SupabaseFinanceRepository implements FinanceRepository {
   @override
   Future<bool> isOnboardingCompleted() async {
     final res = await _client.from('user_settings').select('onboarding_completed').maybeSingle();
-    return (res?['onboarding_completed'] as bool?) ?? false;
+    final explicitlyCompleted = (res?['onboarding_completed'] as bool?) ?? false;
+    if (explicitlyCompleted) return true;
+
+    // Fallback: If user already has accounts, onboarding is inherently completed
+    try {
+      final accounts = await _client.from('accounts').select('id').limit(1);
+      if ((accounts as List).isNotEmpty) {
+        await setOnboardingCompleted(true);
+        return true;
+      }
+    } catch (_) {}
+
+    return false;
   }
 
   @override

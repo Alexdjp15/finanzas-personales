@@ -1187,27 +1187,26 @@ Este archivo conserva el contexto histórico, el estado técnico, las decisiones
 
 ---
 
-## 34. Persistencia de Sesión Móvil y Acceso Rápido a Modo Demo (2026-10-15)
+## 34. Corrección Definitiva de Onboarding, Datos Semilla y Limpieza de Login (2026-10-15)
 
 ### 34.1. Causa Raíz Identificada
-- **Persistencia en LocalStorage:** El navegador web del teléfono almacena el token JWT de la sesión activa de Supabase (`alexdjp15@gmail.com`). Al abrir la URL, Supabase restaura automáticamente la sesión sin volver a solicitar credenciales, cargando el dashboard de la cuenta personal si no se había cerrado sesión previamente.
+1. **Redirección No Deseada a Onboarding:** Al iniciar sesión con el usuario `demo_tester`, la tabla `public.user_settings` carecía de un registro para su UUID, por lo que `isOnboardingCompleted()` retornaba `false`. Esto provocaba que `AuthGate` enviara al usuario al "Asistente de Configuración Inicial" en lugar de mostrar el `DashboardScreen` con los datos ya sembrados.
+2. **Error 23505 (Violación de Constraint Único):** Al estar en `OnboardingScreen`, el asistente intentaba crear de nuevo cuentas y bolsillos ("Personal"). Dado que el script de siembra ya los había creado, Postgres lanzaba `duplicate key value violates unique constraint "pockets_account_id_name_key"`.
+3. **Botón en Login:** El usuario solicitó remover el botón de demo en la pantalla de login para mantener el formulario de autenticación completamente limpio y profesional.
 
-### 34.2. Soluciones Implementadas
-1. **Botón "⚡ Entrar a Cuenta Demo" en LoginScreen ([`lib/presentation/screens/login_screen.dart`](file:///lib/presentation/screens/login_screen.dart)):**
-   - Botón visible con estilo ámbar destacado en la pantalla de inicio de sesión (`Key('btn_login_demo')`).
-   - Al tocarlo en móvil o escritorio, llena automáticamente las credenciales (`demo_tester` / `Password123!`) e inicia sesión en 1 solo toque sin necesidad de escribir en el teclado móvil.
-2. **Soporte de Conmutación Automática por URL:**
-   - Si se abre la app con el parámetro `?demo=true`, `?demo=1` o `?action=demo`:
-     - En `LoginScreen`: ejecuta inmediatamente el inicio de sesión como usuario demo.
-     - En `DashboardScreen`: si la sesión activa actual no es `demo_tester` (por ejemplo, `alexdjp15`), cierra automáticamente la sesión actual e inicia sesión directamente con el usuario demo.
-3. **Indicador Visual del Usuario Activo en el AppBar ([`lib/presentation/screens/dashboard_screen.dart`](file:///lib/presentation/screens/dashboard_screen.dart)):**
-   - Subtítulo tipográfico claro debajo de "Finanzas":
-     - Para la cuenta demo: `● Modo Demo (@demo_tester)` en color ámbar de alto contraste.
-     - Para la cuenta personal: `@alexdjp15` en color secundario sutil.
-   - Permite al usuario verificar inmediatamente en qué cuenta está operando.
-4. **Invalidación de Caché de Estado en Logout:**
-   - Al pulsar el botón de cerrar sesión (icono de salida en el AppBar), se ejecuta `invalidateFinanceProviders(ref)` asegurando que todos los providers de Riverpod limpien los datos en memoria antes de volver a la pantalla de login.
-5. **Pruebas y Calidad:**
-   - 187 de 187 tests unitarios y de widgets pasando al 100% en verde.
+### 34.2. Soluciones Aplicadas
+1. **Remoción del Botón Demo en LoginScreen ([`lib/presentation/screens/login_screen.dart`](file:///lib/presentation/screens/login_screen.dart)):**
+   - Eliminado el botón `btn_login_demo` y cualquier lógica de auto-login de la pantalla de login.
+   - La pantalla de login queda 100% limpia para iniciar sesión normalmente con usuario/correo y contraseña.
+2. **Detección Automática de Onboarding Completado ([`lib/data/supabase_finance_repository.dart`](file:///lib/data/supabase_finance_repository.dart)):**
+   - Se actualizó `isOnboardingCompleted()` para que, si `user_settings` no tiene registro o está en `false`, verifique si el usuario ya cuenta con cuentas bancarias registradas en la base de datos. Si existen cuentas, auto-repara `user_settings` asignando `onboarding_completed: true` y retorna `true`, evitando permanentemente que usuarios existentes o sembrados caigan en el onboarding.
+3. **Idempotencia en Creación de Bolsillos ([`lib/data/supabase_finance_repository.dart`](file:///lib/data/supabase_finance_repository.dart)):**
+   - `createPocket()` ahora verifica primero si ya existe un bolsillo con el mismo nombre en esa cuenta. Si existe, actualiza el saldo si es mayor a cero y retorna el bolsillo existente sin provocar error 23505.
+4. **Garantía en Script de Siembra ([`tool/seed_test_user.dart`](file:///tool/seed_test_user.dart)):**
+   - Asegura la inserción de `user_settings` con `onboarding_completed: true`.
+   - Ejecutado y verificado en la base de datos remota de Supabase con `onboarding_completed: true` para `demo_tester`.
+5. **Verificación de Pruebas:**
+   - `flutter analyze`: 0 errores, 0 advertencias.
+   - `flutter test`: **186 de 186 tests pasando al 100% en verde**.
 
 
